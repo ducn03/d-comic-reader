@@ -32,6 +32,7 @@ async function fetchHtml(targetUrl) {
   let lastErr = null;
   const domainsToTry = [BASE_URL, ...MIRROR_DOMAINS.filter(d => d !== BASE_URL)];
 
+  const allErrors = [];
   for (const domain of domainsToTry) {
     let url = targetUrl;
     try {
@@ -48,13 +49,13 @@ async function fetchHtml(targetUrl) {
         BASE_URL = domain;
         return text;
       }
-      lastErr = new Error(`HTTP ${res.status} [${domain}]: ${text.slice(0, 200).replace(/\s+/g, ' ')}`);
+      allErrors.push(`${domain} => ${res.status}: ${text.slice(0, 100).replace(/\s+/g, ' ')}`);
     } catch (e) {
-      lastErr = e;
+      allErrors.push(`${domain} => ${e.message}`);
     }
   }
 
-  throw lastErr || new Error(`Failed to fetch ${targetUrl}`);
+  throw new Error(`All mirrors blocked: ${allErrors.join(' | ')}`);
 }
 
 function extractSlug(url) {
