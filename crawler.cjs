@@ -43,11 +43,12 @@ async function fetchHtml(targetUrl) {
 
     try {
       const res = await fetch(url, { headers: { ...headers, 'Referer': domain + '/' } });
+      const text = await res.text();
       if (res.ok) {
         BASE_URL = domain;
-        return await res.text();
+        return text;
       }
-      lastErr = new Error(`HTTP ${res.status}: Failed to fetch ${url}`);
+      lastErr = new Error(`HTTP ${res.status} [${domain}]: ${text.slice(0, 200).replace(/\s+/g, ' ')}`);
     } catch (e) {
       lastErr = e;
     }
