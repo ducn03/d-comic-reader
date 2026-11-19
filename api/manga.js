@@ -117,7 +117,12 @@ module.exports = async (req, res) => {
       return;
     }
 
-    sendJson(404, { error: `Endpoint '${endpoint}' not found` });
+    sendJson(404, {
+      error: `Endpoint '${endpoint}' not found`,
+      url: req.url,
+      query: req.query,
+      matched: req.headers['x-matched-path']
+    });
   } catch (err) {
     sendJson(500, { error: err.message });
   }
