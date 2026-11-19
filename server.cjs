@@ -56,11 +56,19 @@ const server = http.createServer(async (req, res) => {
   const pathname = decodeURI(urlObj.pathname);
 
   // API Endpoints
-  if (pathname.startsWith('/api/manga/') || pathname.startsWith('/api/')) {
-    const endpoint = pathname.startsWith('/api/manga/')
-      ? pathname.replace('/api/manga/', '')
-      : pathname.replace('/api/', '');
+  let endpoint = urlObj.searchParams.get('endpoint') || (req.query && req.query.endpoint);
+  if (!endpoint) {
+    if (pathname.startsWith('/api/manga/')) {
+      endpoint = pathname.replace('/api/manga/', '');
+    } else if (pathname.startsWith('/api/')) {
+      endpoint = pathname.replace('/api/', '');
+    }
+  }
+  if (endpoint) {
+    endpoint = endpoint.replace(/\.js$/, '').replace(/^\/+|\/+$/g, '').trim();
+  }
 
+  if (endpoint && ['home', 'search', 'genre', 'detail', 'chapter', 'image'].includes(endpoint)) {
     try {
       if (endpoint === 'home') {
         const page = parseInt(urlObj.searchParams.get('page') || '1', 10);
@@ -114,7 +122,7 @@ const server = http.createServer(async (req, res) => {
       }
 
       res.writeHead(404, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Endpoint not found' }));
+      res.end(JSON.stringify({ error: `Endpoint '${endpoint}' not found` }));
       return;
     } catch (err) {
       console.error(`API Error [${endpoint}]:`, err.message);
@@ -122,6 +130,10 @@ const server = http.createServer(async (req, res) => {
       res.end(JSON.stringify({ error: err.message }));
       return;
     }
+  } else if (pathname.startsWith('/api/')) {
+    res.writeHead(404, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: `Endpoint '${endpoint}' not found` }));
+    return;
   }
 
   // Static File Serving
