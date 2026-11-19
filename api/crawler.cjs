@@ -1,12 +1,14 @@
 /**
- * Crawler & API Module for hinettruyen.com
+ * Crawler & API Module for NetTruyen & Hinettruyen
+ * Multi-domain fallback to bypass datacenter blocks
  */
 const https = require('https');
 const http = require('http');
 const { URL } = require('url');
 
 const MIRROR_DOMAINS = [
-  'https://nettruyenviet10.com',
+  'https://nettruyentv.me',
+  'https://nettruyen.info',
   'https://hinettruyen.com'
 ];
 let BASE_URL = MIRROR_DOMAINS[0];
@@ -29,10 +31,9 @@ async function fetchHtml(targetUrl) {
     'Pragma': 'no-cache'
   };
 
-  let lastErr = null;
   const domainsToTry = [BASE_URL, ...MIRROR_DOMAINS.filter(d => d !== BASE_URL)];
-
   const allErrors = [];
+
   for (const domain of domainsToTry) {
     let url = targetUrl;
     try {
@@ -45,7 +46,7 @@ async function fetchHtml(targetUrl) {
     try {
       const res = await fetch(url, { headers: { ...headers, 'Referer': domain + '/' } });
       const text = await res.text();
-      if (res.ok) {
+      if (res.ok && !text.includes('Just a moment...') && !text.includes('cf-browser-verification')) {
         BASE_URL = domain;
         return text;
       }
@@ -61,18 +62,23 @@ async function fetchHtml(targetUrl) {
 function extractSlug(url) {
   if (!url) return '';
   const match = url.match(/\/truyen-tranh\/([^\/?#]+)/i);
-  return match ? match[1] : '';
+  if (match) return match[1];
+  const parts = url.split('/').filter(Boolean);
+  return parts.pop() || '';
 }
 
 function parseComicsList(html) {
   const comics = [];
-  const itemBlocks = html.split('<div class="item"');
+  let itemBlocks = html.split('<div class="item"');
+  if (itemBlocks.length <= 1 && html.includes('<div class="book_avatar"')) {
+    itemBlocks = html.split('<div class="book_avatar"');
+  }
 
   for (let i = 1; i < itemBlocks.length; i++) {
     const block = itemBlocks[i];
 
     // Title & Link
-    const titleMatch = block.match(/<figcaption>[\s\S]*?<h3>[\s\S]*?<a[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/i);
+    const titleMatch = block.match(/<h3>[\s\S]*?<a[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/i);
     if (!titleMatch) continue;
 
     const fullUrl = titleMatch[1].trim();
@@ -80,10 +86,8 @@ function parseComicsList(html) {
     const slug = extractSlug(fullUrl);
 
     // Cover Image
-    const imgMatch = block.match(/<div class="image">[\s\S]*?<img[^>]*data-original="([^"]+)"/i)
-      || block.match(/<div class="image">[\s\S]*?<img[^>]*data-retries="([^"]+)"/i)
-      || block.match(/<div class="image">[\s\S]*?<img[^>]*src="([^"]+)"/i);
-    let cover = imgMatch ? imgMatch[1].trim() : '';
+    const imgMatch = block.match(/<img[^>]*?(?:data-src|data-original|data-retries|src)="([^"]+)"/i);
+    let cover = imgMatch ? imgMatch[1].trim().replace(/&amp;/g, '&') : '';
     if (cover.startsWith('//')) cover = 'https:' + cover;
 
     // View info
@@ -95,15 +99,18 @@ function parseComicsList(html) {
 
     // Chapters
     const chapters = [];
-    const chapMatches = [...block.matchAll(/<li class="chapter clearfix">[\s\S]*?<a[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?<i class="time">([\s\S]*?)<\/i>/gi)];
+    const chapMatches = [
+      ...block.matchAll(/<li class="chapter clearfix">[\s\S]*?<a[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?<i class="time">([\s\S]*?)<\/i>/gi),
+      ...block.matchAll(/<a[^>]*href="([^"]+)"[^>]*title="([^"]*Chapter[^"]*|[^"]*Chap[^"]*)"[^>]*>([\s\S]*?)<\/a>/gi)
+    ];
     for (const cm of chapMatches) {
       const cUrl = cm[1].trim();
-      const cSlugMatch = cUrl.match(/\/chuong-[^\/?#]+/i) || cUrl.match(/\/chapter-[^\/?#]+/i);
+      const cSlugMatch = cUrl.match(/\/(chuong-[^\/?#]+)/i) || cUrl.match(/\/(chapter-[^\/?#]+)/i) || cUrl.match(/\/([^/?#]+-chap-[^/?#]+)/i);
       chapters.push({
         url: cUrl,
-        chapterSlug: cSlugMatch ? cSlugMatch[0].replace('/', '') : '',
-        title: cm[2].replace(/<[^>]+>/g, '').trim(),
-        time: cm[3].trim()
+        chapterSlug: cSlugMatch ? (cSlugMatch[1] || cSlugMatch[0].replace('/', '')) : cUrl.split('/').filter(Boolean).pop(),
+        title: (cm[3] || cm[2] || '').replace(/<[^>]+>/g, '').trim(),
+        time: (cm[4] || '').trim()
       });
     }
 
@@ -142,9 +149,14 @@ function parseComicsList(html) {
 }
 
 async function getHome(page = 1, sort = 0, status = 0) {
-  let url = `${BASE_URL}/trang-chu/`;
-  if (page > 1 || sort || status) {
-    url = `${BASE_URL}/tim-truyen?page=${page}${sort ? `&sort=${sort}` : ''}${status ? `&status=${status}` : ''}`;
+  let url;
+  if (BASE_URL.includes('nettruyentv')) {
+    url = page > 1 ? `${BASE_URL}/?page=${page}` : `${BASE_URL}/`;
+  } else {
+    url = `${BASE_URL}/trang-chu/`;
+    if (page > 1 || sort || status) {
+      url = `${BASE_URL}/tim-truyen?page=${page}${sort ? `&sort=${sort}` : ''}${status ? `&status=${status}` : ''}`;
+    }
   }
   const html = await fetchHtml(url);
   return parseComicsList(html);
@@ -152,103 +164,84 @@ async function getHome(page = 1, sort = 0, status = 0) {
 
 async function searchManga(keyword, page = 1) {
   const enc = encodeURIComponent(keyword);
-  const url = `${BASE_URL}/tim-truyen?keyword=${enc}&page=${page}`;
+  let url = BASE_URL.includes('nettruyentv')
+    ? `${BASE_URL}/tim-kiem?keyword=${enc}&page=${page}`
+    : `${BASE_URL}/tim-truyen?keyword=${enc}&page=${page}`;
   const html = await fetchHtml(url);
   return parseComicsList(html);
 }
 
 async function getGenre(genreSlug, page = 1) {
-  const url = `${BASE_URL}/tim-truyen/${encodeURIComponent(genreSlug)}?page=${page}`;
+  const enc = encodeURIComponent(genreSlug);
+  let url = BASE_URL.includes('nettruyentv')
+    ? `${BASE_URL}/the-loai/${enc}?page=${page}`
+    : `${BASE_URL}/tim-truyen/${enc}?page=${page}`;
   const html = await fetchHtml(url);
   return parseComicsList(html);
 }
 
 async function getDetail(slug) {
-  const url = `${BASE_URL}/truyen-tranh/${slug}`;
+  let url = BASE_URL.includes('nettruyentv')
+    ? `${BASE_URL}/${slug}`
+    : `${BASE_URL}/truyen-tranh/${slug}`;
   const html = await fetchHtml(url);
 
   // Title
-  const titleMatch = html.match(/<h1[^>]*class="title-detail"[^>]*>([\s\S]*?)<\/h1>/i)
-    || html.match(/<meta property="og:title" content="([^"]+)"/i);
-  const title = titleMatch ? titleMatch[1].replace(/<[^>]+>/g, '').trim() : slug;
+  const titleMatch = html.match(/<h1 class="title-detail">([\s\S]*?)<\/h1>/i)
+    || html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
+  const title = titleMatch ? titleMatch[1].replace(/<[^>]+>/g, '').trim() : '';
 
-  // Cover
-  const coverMatch = html.match(/<div class="col-xs-4 col-image">[\s\S]*?<img[^>]*src="([^"]+)"/i)
-    || html.match(/<meta property="og:image" content="([^"]+)"/i);
-  let cover = coverMatch ? coverMatch[1].trim() : '';
+  // Cover Image
+  const imgMatch = html.match(/<div class="col-xs-4 col-image">[\s\S]*?<img[^>]*src="([^"]+)"/i)
+    || html.match(/<div class="col-xs-4 col-image">[\s\S]*?<img[^>]*data-original="([^"]+)"/i);
+  let cover = imgMatch ? imgMatch[1].trim().replace(/&amp;/g, '&') : '';
   if (cover.startsWith('//')) cover = 'https:' + cover;
 
-  // Description
-  const descMatch = html.match(/<div class="detail-content">[\s\S]*?<div class="shortened"[^>]*>([\s\S]*?)<\/div>/i);
-  const description = descMatch ? descMatch[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() : '';
-
-  // Author & Status
-  const authorMatch = html.match(/<li class="author row">[\s\S]*?<p class="col-xs-8">([\s\S]*?)<\/p>/i);
-  const statusMatch = html.match(/<li class="status row">[\s\S]*?<p class="col-xs-8">([\s\S]*?)<\/p>/i);
+  // Author
+  const authorMatch = html.match(/<li class="author[^>]*>[\s\S]*?<p class="col-xs-8">([\s\S]*?)<\/p>/i);
   const author = authorMatch ? authorMatch[1].replace(/<[^>]+>/g, '').trim() : 'Đang cập nhật';
-  const status = statusMatch ? statusMatch[1].replace(/<[^>]+>/g, '').trim() : 'Đang tiến hành';
+
+  // Status
+  const statusMatch = html.match(/<li class="status[^>]*>[\s\S]*?<p class="col-xs-8">([\s\S]*?)<\/p>/i);
+  const status = statusMatch ? statusMatch[1].replace(/<[^>]+>/g, '').trim() : 'Đang cập nhật';
 
   // Genres
   const genres = [];
-  const kindMatch = html.match(/<li class="kind row">[\s\S]*?<p class="col-xs-8">([\s\S]*?)<\/p>/i);
-  if (kindMatch) {
-    const gMatches = [...kindMatch[1].matchAll(/<a[^>]*href="([^"]+)"[^>]*>([^<]+)<\/a>/gi)];
-    for (const gm of gMatches) {
-      const gSlug = gm[1].split('/').pop();
-      genres.push({ name: gm[2].trim(), slug: gSlug });
+  const genreBlock = html.match(/<li class="kind[^>]*>[\s\S]*?<p class="col-xs-8">([\s\S]*?)<\/p>/i);
+  if (genreBlock) {
+    const genreMatches = [...genreBlock[1].matchAll(/<a[^>]*href="[^"]*\/([^\/?#]+)"[^>]*>([\s\S]*?)<\/a>/gi)];
+    for (const gm of genreMatches) {
+      genres.push({
+        slug: gm[1],
+        name: gm[2].replace(/<[^>]+>/g, '').trim()
+      });
     }
   }
 
-  // Views & rating
-  const ratingMatch = html.match(/<span itemprop="ratingValue">([\d\.]+)<\/span>/i);
-  const viewsMatch = html.match(/<li class="row">[\s\S]*?Lượt xem[\s\S]*?<p class="col-xs-8">([\d\.,]+)<\/p>/i);
+  // Views & Rating
+  const viewMatch = html.match(/<li[^>]*>[\s\S]*?<p class="col-xs-4">Lượt xem<\/p>[\s\S]*?<p class="col-xs-8">([\s\S]*?)<\/p>/i);
+  const views = viewMatch ? viewMatch[1].replace(/<[^>]+>/g, '').trim() : '';
 
-  // Full Chapter List from API
+  const ratingMatch = html.match(/<span itemprop="ratingValue">([\s\S]*?)<\/span>/i);
+  const rating = ratingMatch ? ratingMatch[1].trim() : '5.0';
+
+  // Description
+  const descMatch = html.match(/<div class="detail-content">[\s\S]*?<p>([\s\S]*?)<\/p>/i);
+  const description = descMatch ? descMatch[1].replace(/<[^>]+>/g, '\n').trim() : '';
+
+  // Chapters
   let chapters = [];
-  try {
-    const apiRes = await fetch(`${BASE_URL}/Comic/Services/ComicService.asmx/ChapterList?slug=${slug}`, {
-      headers: {
-        'User-Agent': USER_AGENT,
-        'Referer': url,
-        'X-Requested-With': 'XMLHttpRequest'
-      }
+  const chapMatches = [...html.matchAll(/<div class="col-xs-5 chapter">[\s\S]*?<a[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?<div class="col-xs-4[^>]*>([\s\S]*?)<\/div>/gi)];
+  for (const cm of chapMatches) {
+    const cUrl = cm[1].trim();
+    const cSlug = cUrl.split('/').filter(Boolean).pop();
+    chapters.push({
+      id: 0,
+      name: cm[2].replace(/<[^>]+>/g, '').trim(),
+      chapterSlug: cSlug,
+      time: cm[3].replace(/<[^>]+>/g, '').trim(),
+      url: cUrl
     });
-    if (apiRes.ok) {
-      const jsonData = await apiRes.json();
-      if (jsonData && Array.isArray(jsonData.data) && jsonData.data.length > 0) {
-        chapters = jsonData.data.map(item => ({
-          id: item.chapter_id,
-          name: item.chapter_name,
-          chapterSlug: item.chapter_slug || `chuong-${item.chapter_num}`,
-          num: item.chapter_num,
-          time: item.updated_at,
-          views: item.view,
-          imageCount: item.image_num,
-          url: `/truyen-tranh/${slug}/${item.chapter_slug || ('chuong-' + item.chapter_num)}`
-        }));
-      }
-    }
-  } catch (e) {
-    console.error('Error fetching chapter list API:', e.message);
-  }
-
-  // Fallback to HTML chapters if API failed or empty
-  if (chapters.length === 0) {
-    const chapBlockMatch = html.match(/<div class="list-chapter"[\s\S]*?<nav>([\s\S]*?)<\/nav>/i);
-    if (chapBlockMatch) {
-      const chapMatches = [...chapBlockMatch[1].matchAll(/<div class="col-xs-5 chapter">[\s\S]*?<a[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?<div class="col-xs-4[^>]*>([\s\S]*?)<\/div>/gi)];
-      for (const cm of chapMatches) {
-        const cUrl = cm[1].trim();
-        const cSlugMatch = cUrl.match(/\/([^\/?#]+)$/i);
-        chapters.push({
-          id: 0,
-          name: cm[2].replace(/<[^>]+>/g, '').trim(),
-          chapterSlug: cSlugMatch ? cSlugMatch[1] : '',
-          time: cm[3].replace(/<[^>]+>/g, '').trim(),
-          url: cUrl
-        });
-      }
-    }
   }
 
   return {
@@ -258,76 +251,53 @@ async function getDetail(slug) {
     cover,
     author,
     status,
-    rating: ratingMatch ? ratingMatch[1] : '5.0',
-    views: viewsMatch ? viewsMatch[1].trim() : '0',
     genres,
+    views,
+    rating,
     description,
     chapters
   };
 }
 
 async function getChapter(slug, chapterSlug) {
-  let url = `${BASE_URL}/truyen-tranh/${slug}/${chapterSlug}`;
+  let url = BASE_URL.includes('nettruyentv')
+    ? `${BASE_URL}/${slug}/${chapterSlug}`
+    : `${BASE_URL}/truyen-tranh/${slug}/${chapterSlug}`;
   const html = await fetchHtml(url);
 
   // Comic Title & Chapter Title
-  const breadcrumbs = [...html.matchAll(/<li itemprop="itemListElement"[\s\S]*?<span itemprop="name">([\s\S]*?)<\/span>/gi)];
-  let comicTitle = slug;
-  let chapterTitle = chapterSlug;
-  if (breadcrumbs.length >= 3) {
-    comicTitle = breadcrumbs[2][1].trim();
-  }
-  if (breadcrumbs.length >= 4) {
-    chapterTitle = breadcrumbs[3][1].trim();
-  }
+  const breadcrumbs = [...html.matchAll(/<li itemprop="itemListElement"[\s\S]*?<a[^>]*>[\s\S]*?<span itemprop="name">([\s\S]*?)<\/span>/gi)];
+  const comicTitle = breadcrumbs.length > 1 ? breadcrumbs[breadcrumbs.length - 2][1].trim() : slug;
+  const currentChapter = breadcrumbs.length > 0 ? breadcrumbs[breadcrumbs.length - 1][1].trim() : chapterSlug;
 
-  // Images
-  const imgMatches = [...html.matchAll(/<div class=['"]page-chapter['"][^>]*>[\s\S]*?<img[^>]*?(?:data-src|data-sv1|src)=['"]([^'"]+)['"]/gi)];
-  const rawImages = imgMatches.map(m => m[1].trim()).filter(u => !u.includes('notice-nettruyen') && !u.includes('thumb-default'));
-
-  // Ensure absolute URLs
-  const images = rawImages.map(src => {
-    if (src.startsWith('//')) return 'https:' + src;
-    if (src.startsWith('/')) return BASE_URL + src;
-    return src;
-  });
-
-  // Prev & Next Chapter URLs
-  let prevChapterSlug = null;
-  let nextChapterSlug = null;
-
-  const prevMatch = html.match(/<a[^>]*href="([^"]+)"[^>]*class="[^"]*prev[^"]*"/i) || html.match(/class="[^"]*prev[^"]*"[^>]*href="([^"]+)"/i);
-  const nextMatch = html.match(/<a[^>]*href="([^"]+)"[^>]*class="[^"]*next[^"]*"/i) || html.match(/class="[^"]*next[^"]*"[^>]*href="([^"]+)"/i);
-
-  function parseChapterSlugFromUrl(u) {
-    if (!u) return null;
-    const parts = u.trim().split('/').filter(Boolean);
-    return parts[parts.length - 1];
+  // Chapter Images
+  const images = [];
+  const imgMatches = [...html.matchAll(/<div class="page-chapter">[\s\S]*?<img[^>]*?(?:data-src|data-original|src)="([^"]+)"/gi)];
+  for (const im of imgMatches) {
+    let src = im[1].trim().replace(/&amp;/g, '&');
+    if (src && !src.includes('logo') && !src.includes('brandview') && !src.includes('banner')) {
+      if (src.startsWith('//')) src = 'https:' + src;
+      images.push(src);
+    }
   }
 
-  if (prevMatch && !prevMatch[0].includes('disabled')) {
-    prevChapterSlug = parseChapterSlugFromUrl(prevMatch[1]);
-  }
-  if (nextMatch && !nextMatch[0].includes('disabled')) {
-    nextChapterSlug = parseChapterSlugFromUrl(nextMatch[1]);
-  }
+  // Prev / Next Chapter Navigation
+  const prevMatch = html.match(/<a[^>]*href="([^"]+)"[^>]*class="[^"]*prev[^"]*"/i)
+    || html.match(/<a[^>]*class="[^"]*prev[^"]*"[^>]*href="([^"]+)"/i);
+  const nextMatch = html.match(/<a[^>]*href="([^"]+)"[^>]*class="[^"]*next[^"]*"/i)
+    || html.match(/<a[^>]*class="[^"]*next[^"]*"[^>]*href="([^"]+)"/i);
 
-  // If next/prev points to current chapter or invalid link, nullify it
-  if (prevChapterSlug === chapterSlug || prevChapterSlug === '#' || prevChapterSlug === 'javascript:void(0)') {
-    prevChapterSlug = null;
-  }
-  if (nextChapterSlug === chapterSlug || nextChapterSlug === '#' || nextChapterSlug === 'javascript:void(0)') {
-    nextChapterSlug = null;
-  }
+  const prevSlug = prevMatch && !prevMatch[1].includes('#') ? prevMatch[1].split('/').filter(Boolean).pop() : '';
+  const nextSlug = nextMatch && !nextMatch[1].includes('#') ? nextMatch[1].split('/').filter(Boolean).pop() : '';
 
   return {
     comicTitle,
-    chapterTitle,
-    slug,
+    comicSlug: slug,
+    currentChapter,
     chapterSlug,
     images,
-    prevChapterSlug,
-    nextChapterSlug
+    prevChapterSlug: prevSlug,
+    nextChapterSlug: nextSlug
   };
 }
 
@@ -358,7 +328,6 @@ function proxyImageStream(imageUrl, clientRes) {
     };
 
     const req = client.request(options, (remoteRes) => {
-      // Forward status code or fallback
       if (remoteRes.statusCode >= 400) {
         clientRes.writeHead(remoteRes.statusCode, { 'Content-Type': 'text/plain' });
         remoteRes.pipe(clientRes);
@@ -373,23 +342,29 @@ function proxyImageStream(imageUrl, clientRes) {
       if (remoteRes.headers['content-length']) {
         headers['Content-Length'] = remoteRes.headers['content-length'];
       }
-
       clientRes.writeHead(200, headers);
       remoteRes.pipe(clientRes);
     });
 
     req.on('error', (err) => {
-      console.error('Image proxy error:', err.message);
       if (!clientRes.headersSent) {
         clientRes.writeHead(502);
-        clientRes.end('Proxy Image Error: ' + err.message);
       }
+      clientRes.end(`Proxy error: ${err.message}`);
+    });
+
+    req.setTimeout(12000, () => {
+      req.destroy();
+      if (!clientRes.headersSent) {
+        clientRes.writeHead(504);
+      }
+      clientRes.end('Image proxy timeout');
     });
 
     req.end();
   } catch (err) {
-    clientRes.writeHead(400);
-    clientRes.end('Invalid URL');
+    clientRes.writeHead(500);
+    clientRes.end(`Invalid URL: ${err.message}`);
   }
 }
 
