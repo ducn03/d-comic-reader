@@ -1018,20 +1018,24 @@ document.addEventListener('click', (e) => {
   }
 });
 
-el.btnTones.forEach(btn => {
-  btn.onclick = () => {
-    el.btnTones.forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    const tone = btn.dataset.tone;
-    document.body.classList.remove('filter-normal', 'filter-sepia', 'filter-oled');
-    document.body.classList.add(`filter-${tone}`);
-  };
-});
+if (el.btnTones && el.btnTones.length > 0) {
+  el.btnTones.forEach(btn => {
+    btn.onclick = () => {
+      el.btnTones.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const tone = btn.dataset.tone;
+      document.body.classList.remove('filter-normal', 'filter-sepia', 'filter-oled');
+      document.body.classList.add(`filter-${tone}`);
+    };
+  });
+}
 
-el.brightnessSlider.oninput = (e) => {
-  const val = e.target.value;
-  el.readerCanvas.style.filter = `brightness(${val}%)`;
-};
+if (el.brightnessSlider) {
+  el.brightnessSlider.oninput = (e) => {
+    const val = e.target.value;
+    el.readerCanvas.style.filter = `brightness(${val}%)`;
+  };
+}
 
 // Drawer Controls
 el.btnToggleChapterDrawer.onclick = () => {

@@ -1,12 +1,12 @@
 {
   "version": 2,
-  "builds": [
-    { "src": "api/manga.js", "use": "@vercel/node" },
-    { "src": "*", "use": "@vercel/static" }
+  "rewrites": [
+    { "source": "/api/manga/:endpoint", "destination": "/api/manga.js?endpoint=:endpoint" },
+    { "source": "/api/:endpoint", "destination": "/api/manga.js?endpoint=:endpoint" }
   ],
-  "routes": [
-    { "src": "/api/manga/(.*)", "dest": "/api/manga.js" },
-    { "src": "/api/(.*)", "dest": "/api/manga.js" },
-    { "src": "/(.*)", "dest": "/$1" }
-  ]
+  "functions": {
+    "api/manga.js": {
+      "includeFiles": "crawler.cjs"
+    }
+  }
 }
