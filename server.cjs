@@ -65,7 +65,11 @@ const server = http.createServer(async (req, res) => {
     }
   }
   if (endpoint) {
-    endpoint = endpoint.replace(/\.js$/, '').replace(/^\/+|\/+$/g, '').trim();
+    endpoint = endpoint.replace(/^manga\/?/, '').replace(/\.js$/, '').replace(/^\/+|\/+$/g, '').trim();
+  }
+  if (!endpoint || endpoint === 'manga') {
+    const parts = pathname.split('/').filter(p => Boolean(p) && p !== 'api' && p !== 'manga' && p !== 'manga.js');
+    endpoint = parts.pop() || '';
   }
 
   if (endpoint && ['home', 'search', 'genre', 'detail', 'chapter', 'image'].includes(endpoint)) {

@@ -34,11 +34,18 @@ module.exports = async (req, res) => {
     return urlObj.searchParams.get(name) || '';
   };
 
-  // 1. Try searchParams ?endpoint=... or req.query.endpoint
+  // Extract endpoint reliably across all Vercel route/rewrite modes
   let endpoint = getParam('endpoint');
+  if (endpoint) {
+    endpoint = endpoint.replace(/^manga\/?/, '').replace(/\.js$/, '').trim();
+  }
 
-  // 2. Try x-matched-path or original url if present
-  if (!endpoint) {
+  if (!endpoint || endpoint === 'manga') {
+    const parts = decodeURI(urlObj.pathname).split('/').filter(p => Boolean(p) && p !== 'api' && p !== 'manga' && p !== 'manga.js');
+    endpoint = parts.pop() || '';
+  }
+
+  if (!endpoint || endpoint === 'manga') {
     const originalUrl = req.headers['x-matched-path'] || req.url;
     if (originalUrl) {
       const cleanPath = originalUrl.split('?')[0];
@@ -47,12 +54,6 @@ module.exports = async (req, res) => {
         endpoint = match[1];
       }
     }
-  }
-
-  // 3. Fallback: split pathname
-  if (!endpoint) {
-    const parts = decodeURI(urlObj.pathname).split('/').filter(p => Boolean(p) && p !== 'api' && p !== 'manga' && p !== 'manga.js');
-    endpoint = parts[0] || '';
   }
 
   if (endpoint) {
