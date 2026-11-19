@@ -1,4 +1,14 @@
-const crawler = require('../crawler.cjs');
+let crawler;
+try {
+  crawler = require('../crawler.cjs');
+} catch (e) {
+  try {
+    const path = require('path');
+    crawler = require(path.join(process.cwd(), 'crawler.cjs'));
+  } catch (e2) {
+    console.error('Failed to load crawler.cjs:', e2);
+  }
+}
 const { URL } = require('url');
 
 module.exports = async (req, res) => {
@@ -25,6 +35,9 @@ module.exports = async (req, res) => {
     const parts = pathname.split('/').filter(Boolean);
     const last = parts.pop();
     endpoint = (last === 'manga' || last === 'manga.js') ? (parts.pop() || '') : last;
+  }
+  if (endpoint) {
+    endpoint = endpoint.replace(/^\/+|\/+$/g, '');
   }
 
   const sendJson = (status, data) => {

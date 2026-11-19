@@ -2,8 +2,8 @@
   "name": "d-comic-reader",
   "version": "1.0.0",
   "description": "High-End Dark Anime & Manga Reader Web Application crawling Hinettruyen live",
-  "main": "server.js",
   "scripts": {
+    "build": "echo 'Static build ready'",
     "start": "node server.js",
     "dev": "node server.js"
   },

@@ -1,8 +1,8 @@
 {
   "version": 2,
   "rewrites": [
-    { "source": "/api/manga/:endpoint", "destination": "/api/manga.js?endpoint=:endpoint" },
-    { "source": "/api/:endpoint", "destination": "/api/manga.js?endpoint=:endpoint" }
+    { "source": "/api/manga/:match*", "destination": "/api/manga.js?endpoint=:match*" },
+    { "source": "/api/:match*", "destination": "/api/manga.js?endpoint=:match*" }
   ],
   "functions": {
     "api/manga.js": {
