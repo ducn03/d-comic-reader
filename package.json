@@ -1,0 +1,22 @@
+{
+  "name": "d-comic-reader",
+  "version": "1.0.0",
+  "description": "High-End Dark Anime & Manga Reader Web Application crawling Hinettruyen live",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "manga",
+    "reader",
+    "crawler",
+    "hinettruyen",
+    "webtoon"
+  ],
+  "author": "ducn03",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

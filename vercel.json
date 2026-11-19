@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "builds": [
+    { "src": "api/manga.js", "use": "@vercel/node" },
+    { "src": "*", "use": "@vercel/static" }
+  ],
+  "routes": [
+    { "src": "/api/manga/(.*)", "dest": "/api/manga.js" },
+    { "src": "/api/(.*)", "dest": "/api/manga.js" },
+    { "src": "/(.*)", "dest": "/$1" }
+  ]
+}
