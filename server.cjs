@@ -56,20 +56,17 @@ const server = http.createServer(async (req, res) => {
   const pathname = decodeURI(urlObj.pathname);
 
   // API Endpoints
-  let endpoint = urlObj.searchParams.get('endpoint') || (req.query && req.query.endpoint);
+  let endpoint = '';
+  if (pathname.startsWith('/api/manga/')) {
+    endpoint = pathname.replace('/api/manga/', '');
+  } else if (pathname.startsWith('/api/')) {
+    endpoint = pathname.replace('/api/', '');
+  }
   if (!endpoint) {
-    if (pathname.startsWith('/api/manga/')) {
-      endpoint = pathname.replace('/api/manga/', '');
-    } else if (pathname.startsWith('/api/')) {
-      endpoint = pathname.replace('/api/', '');
-    }
+    endpoint = urlObj.searchParams.get('endpoint') || '';
   }
   if (endpoint) {
-    endpoint = endpoint.replace(/^manga\/?/, '').replace(/\.js$/, '').replace(/^\/+|\/+$/g, '').trim();
-  }
-  if (!endpoint || endpoint === 'manga') {
-    const parts = pathname.split('/').filter(p => Boolean(p) && p !== 'api' && p !== 'manga' && p !== 'manga.js');
-    endpoint = parts.pop() || '';
+    endpoint = endpoint.split('?')[0].split('/')[0].replace(/\.js$/, '').trim();
   }
 
   if (endpoint && ['home', 'search', 'genre', 'detail', 'chapter', 'image'].includes(endpoint)) {
