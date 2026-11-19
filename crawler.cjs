@@ -5,13 +5,16 @@ const https = require('https');
 const http = require('http');
 const { URL } = require('url');
 
-const BASE_URL = 'https://hinettruyen.com';
+const MIRROR_DOMAINS = [
+  'https://nettruyenviet10.com',
+  'https://hinettruyen.com'
+];
+let BASE_URL = MIRROR_DOMAINS[0];
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
 
 async function fetchHtml(targetUrl) {
   const headers = {
     'User-Agent': USER_AGENT,
-    'Referer': BASE_URL + '/',
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
     'Accept-Language': 'vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7',
     'Sec-Ch-Ua': '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
@@ -26,11 +29,31 @@ async function fetchHtml(targetUrl) {
     'Pragma': 'no-cache'
   };
 
-  const res = await fetch(targetUrl, { headers });
-  if (!res.ok) {
-    throw new Error(`HTTP ${res.status}: Failed to fetch ${targetUrl}`);
+  let lastErr = null;
+  const domainsToTry = [BASE_URL, ...MIRROR_DOMAINS.filter(d => d !== BASE_URL)];
+
+  for (const domain of domainsToTry) {
+    let url = targetUrl;
+    try {
+      const parsed = new URL(targetUrl);
+      url = `${domain}${parsed.pathname}${parsed.search}`;
+    } catch (e) {
+      url = `${domain}${targetUrl.startsWith('/') ? '' : '/'}${targetUrl}`;
+    }
+
+    try {
+      const res = await fetch(url, { headers: { ...headers, 'Referer': domain + '/' } });
+      if (res.ok) {
+        BASE_URL = domain;
+        return await res.text();
+      }
+      lastErr = new Error(`HTTP ${res.status}: Failed to fetch ${url}`);
+    } catch (e) {
+      lastErr = e;
+    }
   }
-  return await res.text();
+
+  throw lastErr || new Error(`Failed to fetch ${targetUrl}`);
 }
 
 function extractSlug(url) {
