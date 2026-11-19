@@ -55,6 +55,30 @@ const server = http.createServer(async (req, res) => {
   const urlObj = new URL(req.url, `http://${hostHeader}`);
   const pathname = decodeURI(urlObj.pathname);
 
+  if (pathname.startsWith('/api/test')) {
+    const testUrl = urlObj.searchParams.get('url') || 'https://hinettruyen.com';
+    try {
+      const tRes = await fetch(testUrl, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+        signal: AbortSignal.timeout(5000)
+      });
+      const tText = await tRes.text();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        url: testUrl,
+        status: tRes.status,
+        server: tRes.headers.get('server'),
+        hasChallenge: tText.includes('Just a moment...'),
+        len: tText.length,
+        title: tText.match(/<title>(.*?)<\/title>/i)?.[1]
+      }));
+    } catch (err) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ url: testUrl, error: err.message }));
+    }
+    return;
+  }
+
   // API Endpoints
   let endpoint = '';
   if (pathname.startsWith('/api/manga/')) {
