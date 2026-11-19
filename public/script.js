@@ -218,6 +218,12 @@ const el = {
 
 function getProxyImageUrl(rawUrl) {
   if (!rawUrl) return '/assets/images/thumb-default.jpg';
+  // Direct fast Cloudflare CDN loading with 0 server delay
+  if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
+    if (rawUrl.includes('khotruyen.site') || rawUrl.includes('img.otruyenapi.com') || rawUrl.includes('storage/thumbnails')) {
+      return rawUrl;
+    }
+  }
   return `${API_BASE}/image?url=${encodeURIComponent(rawUrl)}`;
 }
 

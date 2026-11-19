@@ -14,6 +14,26 @@ const MIRROR_DOMAINS = [
 let BASE_URL = MIRROR_DOMAINS[0];
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
 
+// In-Memory Fast Cache with TTL
+const memoryCache = new Map();
+function getCache(key, ttlSeconds = 60) {
+  const item = memoryCache.get(key);
+  if (!item) return null;
+  if (Date.now() - item.time > ttlSeconds * 1000) {
+    memoryCache.delete(key);
+    return null;
+  }
+  return item.data;
+}
+
+function setCache(key, data) {
+  if (memoryCache.size > 250) {
+    const firstKey = memoryCache.keys().next().value;
+    memoryCache.delete(firstKey);
+  }
+  memoryCache.set(key, { time: Date.now(), data });
+}
+
 async function fetchHtml(targetUrl) {
   const headers = {
     'User-Agent': USER_AGENT,
@@ -149,6 +169,10 @@ function parseComicsList(html) {
 }
 
 async function getHome(page = 1, sort = 0, status = 0) {
+  const cacheKey = `home_${page}_${sort}_${status}`;
+  const cached = getCache(cacheKey, 120);
+  if (cached) return cached;
+
   let url;
   if (BASE_URL.includes('nettruyentv')) {
     url = page > 1 ? `${BASE_URL}/?page=${page}` : `${BASE_URL}/`;
@@ -159,28 +183,46 @@ async function getHome(page = 1, sort = 0, status = 0) {
     }
   }
   const html = await fetchHtml(url);
-  return parseComicsList(html);
+  const result = parseComicsList(html);
+  setCache(cacheKey, result);
+  return result;
 }
 
 async function searchManga(keyword, page = 1) {
+  const cacheKey = `search_${keyword.toLowerCase().trim()}_${page}`;
+  const cached = getCache(cacheKey, 120);
+  if (cached) return cached;
+
   const enc = encodeURIComponent(keyword);
   let url = BASE_URL.includes('nettruyentv')
     ? `${BASE_URL}/tim-kiem?keyword=${enc}&page=${page}`
     : `${BASE_URL}/tim-truyen?keyword=${enc}&page=${page}`;
   const html = await fetchHtml(url);
-  return parseComicsList(html);
+  const result = parseComicsList(html);
+  setCache(cacheKey, result);
+  return result;
 }
 
 async function getGenre(genreSlug, page = 1) {
+  const cacheKey = `genre_${genreSlug}_${page}`;
+  const cached = getCache(cacheKey, 180);
+  if (cached) return cached;
+
   const enc = encodeURIComponent(genreSlug);
   let url = BASE_URL.includes('nettruyentv')
     ? `${BASE_URL}/the-loai/${enc}?page=${page}`
     : `${BASE_URL}/tim-truyen/${enc}?page=${page}`;
   const html = await fetchHtml(url);
-  return parseComicsList(html);
+  const result = parseComicsList(html);
+  setCache(cacheKey, result);
+  return result;
 }
 
 async function getDetail(slug) {
+  const cacheKey = `detail_${slug}`;
+  const cached = getCache(cacheKey, 300);
+  if (cached) return cached;
+
   let url = BASE_URL.includes('nettruyentv')
     ? `${BASE_URL}/${slug}`
     : `${BASE_URL}/truyen-tranh/${slug}`;
@@ -244,7 +286,7 @@ async function getDetail(slug) {
     });
   }
 
-  return {
+  const result = {
     title,
     slug,
     url,
@@ -257,9 +299,15 @@ async function getDetail(slug) {
     description,
     chapters
   };
+  setCache(cacheKey, result);
+  return result;
 }
 
 async function getChapter(slug, chapterSlug) {
+  const cacheKey = `chapter_${slug}_${chapterSlug}`;
+  const cached = getCache(cacheKey, 600);
+  if (cached) return cached;
+
   let url = BASE_URL.includes('nettruyentv')
     ? `${BASE_URL}/${slug}/${chapterSlug}`
     : `${BASE_URL}/truyen-tranh/${slug}/${chapterSlug}`;
@@ -290,7 +338,7 @@ async function getChapter(slug, chapterSlug) {
   const prevSlug = prevMatch && !prevMatch[1].includes('#') ? prevMatch[1].split('/').filter(Boolean).pop() : '';
   const nextSlug = nextMatch && !nextMatch[1].includes('#') ? nextMatch[1].split('/').filter(Boolean).pop() : '';
 
-  return {
+  const chapterResult = {
     comicTitle,
     comicSlug: slug,
     currentChapter,
@@ -299,6 +347,8 @@ async function getChapter(slug, chapterSlug) {
     prevChapterSlug: prevSlug,
     nextChapterSlug: nextSlug
   };
+  setCache(cacheKey, chapterResult);
+  return chapterResult;
 }
 
 function proxyImageStream(imageUrl, clientRes) {
