@@ -428,7 +428,15 @@ async function getHome(page = 1, sort = 0, status = 0) {
   // 1. Try TruyenQQ Primary
   try {
     let path = '/truyen-moi-cap-nhat';
-    if (sort === 1) {
+    if (status === 2) {
+      path = page > 1 ? `/truyen-hoan-thanh/trang-${page}` : '/truyen-hoan-thanh';
+    } else if (sort === 11) {
+      path = page > 1 ? `/top-thang/trang-${page}` : '/top-thang';
+    } else if (sort === 12) {
+      path = page > 1 ? `/top-tuan/trang-${page}` : '/top-tuan';
+    } else if (sort === 20) {
+      path = page > 1 ? `/truyen-yeu-thich/trang-${page}` : '/truyen-yeu-thich';
+    } else if (sort === 1 || sort === 10) {
       path = page > 1 ? `/top-ngay/trang-${page}` : '/top-ngay';
     } else {
       path = page > 1 ? `/truyen-moi-cap-nhat/trang-${page}` : '/truyen-moi-cap-nhat';
@@ -442,7 +450,20 @@ async function getHome(page = 1, sort = 0, status = 0) {
   // 2. Fallback to NetTruyen if empty
   if (comics.length === 0) {
     try {
-      const targetPath = page > 1 ? `/tim-truyen?page=${page}` : '/';
+      let targetPath = '/';
+      if (status === 2) {
+        targetPath = `/tim-truyen?status=2${page > 1 ? `&page=${page}` : ''}`;
+      } else if (sort === 11) {
+        targetPath = `/tim-truyen?sort=11${page > 1 ? `&page=${page}` : ''}`;
+      } else if (sort === 12) {
+        targetPath = `/tim-truyen?sort=12${page > 1 ? `&page=${page}` : ''}`;
+      } else if (sort === 20) {
+        targetPath = `/tim-truyen?sort=20${page > 1 ? `&page=${page}` : ''}`;
+      } else if (sort === 1 || sort === 10) {
+        targetPath = `/tim-truyen?sort=10${page > 1 ? `&page=${page}` : ''}`;
+      } else {
+        targetPath = page > 1 ? `/tim-truyen?page=${page}` : '/';
+      }
       const html = await fetchNetTruyenHtml(targetPath);
       comics = parseNetTruyenList(html);
     } catch (err2) {
