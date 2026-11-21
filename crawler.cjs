@@ -440,7 +440,13 @@ async function searchManga(keyword, page = 1) {
   try {
     const searchUrl = `${TRUYENQQ_BASE}/tim-kiem?s=${encodeURIComponent(cleanKw)}${page > 1 ? `&page=${page}` : ''}`;
     const html = await fetchQQ(searchUrl);
-    comics = parseQQComics(html);
+    const startIdx = html.indexOf('class="title-list"') > -1 ? html.indexOf('class="title-list"') : (html.indexOf('TÌM KIẾM') > -1 ? html.indexOf('TÌM KIẾM') : 0);
+    const searchSection = html.slice(startIdx);
+    comics = parseQQComics(searchSection);
+    // If searchSection yielded results, use them; otherwise fallback to full html
+    if (comics.length === 0) {
+      comics = parseQQComics(html);
+    }
   } catch (err) {
     console.warn('TruyenQQ search fallback to NetTruyen:', err.message);
   }
