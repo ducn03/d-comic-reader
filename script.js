@@ -45,50 +45,35 @@ const state = {
   readChapters: JSON.parse(localStorage.getItem('mf_read_chapters') || '{}')
 };
 
-// 42 Verified Categories from Hinettruyen.com
+// Verified Clean Categories from NetTruyen Engine
 const GENRES_CATALOG = [
-  { name: 'Action', slug: 'action-95', icon: '⚔️' },
-  { name: 'Manhwa', slug: 'manhwa-11400', icon: '🇰🇷' },
+  { name: 'Action', slug: 'action', icon: '⚔️' },
+  { name: 'Manhwa', slug: 'manhwa', icon: '🇰🇷' },
   { name: 'Manhua', slug: 'manhua', icon: '🇨🇳' },
-  { name: 'Manga', slug: 'manga-112', icon: '🇯🇵' },
-  { name: 'Tu Tiên', slug: 'tu-tien', icon: '⚡' },
-  { name: 'Chuyển Sinh', slug: 'chuyen-sinh-2130', icon: '✨' },
-  { name: 'Xuyên Không', slug: 'xuyen-khong-205', icon: '🚀' },
-  { name: 'Cổ Đại', slug: 'co-dai-207', icon: '🏯' },
-  { name: 'Ngôn Tình', slug: 'ngon-tinh', icon: '🌸' },
-  { name: 'Romance', slug: 'romance-121', icon: '💖' },
-  { name: 'Comedy', slug: 'comedy-99', icon: '😂' },
+  { name: 'Manga', slug: 'manga', icon: '🇯🇵' },
+  { name: 'Chuyển Sinh', slug: 'chuyen-sinh', icon: '✨' },
+  { name: 'Xuyên Không', slug: 'xuyen-khong', icon: '🚀' },
+  { name: 'Cổ Đại', slug: 'co-dai', icon: '🏯' },
+  { name: 'Ngôn Tình', slug: 'ngon-tinh', icon: '💕' },
+  { name: 'Romance', slug: 'romance', icon: '💖' },
+  { name: 'Comedy', slug: 'comedy', icon: '😂' },
   { name: 'Adventure', slug: 'adventure', icon: '🧭' },
-  { name: 'Drama', slug: 'drama-103', icon: '🎭' },
-  { name: 'Fantasy', slug: 'fantasy-105', icon: '🧙' },
-  { name: 'Shounen', slug: 'shounen-127', icon: '⚡' },
+  { name: 'Fantasy', slug: 'fantasy', icon: '🧙' },
+  { name: 'Shounen', slug: 'shounen', icon: '⚡' },
   { name: 'Truyện Màu', slug: 'truyen-mau', icon: '🎨' },
   { name: 'Webtoon', slug: 'webtoon', icon: '📱' },
   { name: 'Martial Arts', slug: 'martial-arts', icon: '🥋' },
-  { name: 'Mystery', slug: 'mystery', icon: '🕵️' },
+  { name: 'Mystery', slug: 'mystery', icon: '🔍' },
   { name: 'Supernatural', slug: 'supernatural', icon: '🔮' },
-  { name: 'Trinh Thám', slug: 'trinh-tham', icon: '🔍' },
-  { name: 'Horror', slug: 'horror', icon: '👻' },
   { name: 'Sports', slug: 'sports', icon: '⚽' },
   { name: 'Slice of Life', slug: 'slice-of-life', icon: '☕' },
-  { name: 'Đam Mỹ', slug: 'dam-my', icon: '👬' },
   { name: 'School Life', slug: 'school-life', icon: '🏫' },
-  { name: 'Sci-fi', slug: 'sci-fi', icon: '🤖' },
-  { name: 'Shoujo', slug: 'shoujo', icon: '🎀' },
-  { name: 'Shoujo Ai', slug: 'shoujo-ai-126', icon: '👭' },
-  { name: 'Shounen Ai', slug: 'shounen-ai', icon: '👬' },
-  { name: 'Anime', slug: 'anime', icon: '🎬' },
-  { name: 'Comic', slug: 'comic', icon: '💥' },
-  { name: 'Cooking', slug: 'cooking', icon: '🍳' },
-  { name: 'Doujinshi', slug: 'doujinshi', icon: '📚' },
-  { name: 'Gender Bender', slug: 'gender-bender', icon: '🔄' },
-  { name: 'Historical', slug: 'historical', icon: '📜' },
-  { name: 'Live action', slug: 'live-action', icon: '🎥' },
-  { name: 'Mecha', slug: 'mecha-117', icon: '🤖' },
+  { name: 'Sci-fi', slug: 'sci-fi', icon: '🛸' },
+  { name: 'Seinen', slug: 'seinen', icon: '🍷' },
+  { name: 'Mecha', slug: 'mecha', icon: '🤖' },
   { name: 'Psychological', slug: 'psychological', icon: '🧠' },
-  { name: 'Thiếu Nhi', slug: 'thieu-nhi', icon: '🎈' },
-  { name: 'Tragedy', slug: 'tragedy-136', icon: '💔' },
-  { name: 'Truyện Scan', slug: 'truyen-scan', icon: '📑' }
+  { name: 'Harem', slug: 'harem', icon: '🌸' },
+  { name: 'Drama', slug: 'drama', icon: '🎭' }
 ];
 
 // DOM References
@@ -388,6 +373,16 @@ async function loadHome(page = 1, sort = 0, genre = '', status = 0) {
     el.btnPrevPage.disabled = page <= 1;
     el.btnNextPage.disabled = data.comics.length < 20;
 
+    // PRE-WARM top 8 comics into memory so tapping any of them is 100% instant (0ms)!
+    if (data.comics && data.comics.length > 0) {
+      setTimeout(() => {
+        data.comics.slice(0, 8).forEach(c => {
+          const u = `${API_BASE}/detail?slug=${encodeURIComponent(c.slug)}`;
+          fetchCached(u, 300000).catch(() => {});
+        });
+      }, 600);
+    }
+
   } catch (err) {
     console.error('Error loading home:', err);
     if (window.location.protocol === 'file:') {
@@ -595,10 +590,33 @@ async function handleSearch(keyword, page = 1) {
 
 // ==================== Comic Detail View ====================
 
-async function openComicDetail(slug) {
+function openComicDetail(slug) {
+  const targetHash = `#comic/${encodeURIComponent(slug)}`;
+  if (window.location.hash !== targetHash) {
+    window.location.hash = targetHash;
+  } else {
+    _loadComicDetail(slug);
+  }
+}
+
+async function _loadComicDetail(slug) {
+  // OPTIMISTIC RENDER: If we have basic info in state, render immediately (0ms UI!)
+  const existing = (state.loadedComics || []).find(c => c.slug === slug)
+    || (state.bookmarks || []).find(c => c.slug === slug)
+    || (state.history || []).find(c => c.slug === slug);
+
+  if (existing) {
+    el.detailTitle.textContent = existing.title || slug;
+    if (existing.cover) {
+      el.detailCover.src = getProxyImageUrl(existing.cover);
+      el.detailBackdrop.style.backgroundImage = `url(${getProxyImageUrl(existing.cover)})`;
+    }
+    switchView('detail');
+  }
+
   const detailUrl = `${API_BASE}/detail?slug=${encodeURIComponent(slug)}`;
   const isPrecached = clientCache.has(detailUrl);
-  if (!isPrecached) {
+  if (!isPrecached && !existing) {
     showSpinner('Đang tải thông tin truyện & danh sách chương...');
   }
 
@@ -633,8 +651,7 @@ async function openComicDetail(slug) {
 
     el.detailGenres.querySelectorAll('.genre-tag').forEach(tag => {
       tag.onclick = () => {
-        loadHome(1, 0, tag.dataset.slug);
-        switchView('home');
+        navigateTo(`#genre/${encodeURIComponent(tag.dataset.slug)}`);
       };
     });
 
@@ -648,6 +665,12 @@ async function openComicDetail(slug) {
       
       el.btnReadFirst.onclick = () => openChapter(slug, firstChap.chapterSlug);
       el.btnReadLatest.onclick = () => openChapter(slug, latestChap.chapterSlug);
+
+      // Pre-warm latest chapter so tapping "Đọc Ngay" opens in 0ms!
+      setTimeout(() => {
+        const firstUrl = `${API_BASE}/chapter?slug=${encodeURIComponent(slug)}&chapter=${encodeURIComponent(latestChap.chapterSlug)}`;
+        fetchCached(firstUrl, 1800000).catch(() => {});
+      }, 500);
     }
 
     renderChapterButtons();
@@ -737,7 +760,16 @@ function updateFavoriteButtonState(isFav) {
 
 // ==================== Chapter Reader ====================
 
-async function openChapter(slug, chapterSlug) {
+function openChapter(slug, chapterSlug) {
+  const targetHash = `#read/${encodeURIComponent(slug)}/${encodeURIComponent(chapterSlug)}`;
+  if (window.location.hash !== targetHash) {
+    window.location.hash = targetHash;
+  } else {
+    _loadChapter(slug, chapterSlug);
+  }
+}
+
+async function _loadChapter(slug, chapterSlug) {
   stopAutoScroll();
   if (el.readerFloatingDock) el.readerFloatingDock.classList.remove('open');
   state.readingComicSlug = slug;
@@ -1151,18 +1183,7 @@ function setupGenresModal() {
     `;
     card.onclick = () => {
       el.genresModalBackdrop.classList.add('hidden');
-      loadHome(1, 0, g.slug);
-      switchView('home');
-
-      // Update active highlight on home filter strip
-      el.filterChips.forEach(c => {
-        if (c.dataset.genre === g.slug) {
-          c.classList.add('active');
-          c.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-        } else {
-          c.classList.remove('active');
-        }
-      });
+      navigateTo(`#genre/${encodeURIComponent(g.slug)}`);
     };
     el.genresModalGrid.appendChild(card);
   });
@@ -1318,35 +1339,40 @@ el.inputImportBackup.onchange = (e) => {
 // Logo Click -> Home
 el.logoLink.onclick = (e) => {
   e.preventDefault();
-  loadHome(1, 0, '');
-  switchView('home');
+  navigateTo('#home');
 };
 
 // Global Back Button
 el.btnBackGlobal.onclick = () => {
   if (state.currentView === 'reader') {
     if (state.readingComicSlug) {
-      openComicDetail(state.readingComicSlug);
+      navigateTo(`#comic/${encodeURIComponent(state.readingComicSlug)}`);
     } else {
-      switchView('home');
+      navigateTo('#home');
     }
   } else {
-    switchView('home');
+    navigateTo('#home');
   }
 };
 
 el.btnReaderBack.onclick = () => {
   if (state.readingComicSlug) {
-    openComicDetail(state.readingComicSlug);
+    navigateTo(`#comic/${encodeURIComponent(state.readingComicSlug)}`);
   } else {
-    switchView('home');
+    navigateTo('#home');
   }
 };
 
 // Search trigger
-el.searchBtn.onclick = () => handleSearch(el.searchInput.value);
+el.searchBtn.onclick = () => {
+  const q = el.searchInput.value.trim();
+  if (q) navigateTo(`#search/${encodeURIComponent(q)}`);
+};
 el.searchInput.onkeydown = (e) => {
-  if (e.key === 'Enter') handleSearch(el.searchInput.value);
+  if (e.key === 'Enter') {
+    const q = el.searchInput.value.trim();
+    if (q) navigateTo(`#search/${encodeURIComponent(q)}`);
+  }
 };
 el.searchClearBtn.onclick = () => {
   el.searchInput.value = '';
@@ -1360,14 +1386,7 @@ el.navBtns.forEach(btn => {
   const tab = btn.dataset.tab;
   if (!tab) return; // Do NOT overwrite buttons without data-tab (#btn-open-genres-modal, #btn-random-manga)
   btn.onclick = () => {
-    if (tab === 'home') {
-      loadHome(1, 0, '');
-      switchView('home');
-    } else if (tab === 'bookmarks') {
-      renderBookmarks();
-    } else if (tab === 'history') {
-      renderHistory();
-    }
+    navigateTo(`#${tab}`);
   };
 });
 
@@ -1382,20 +1401,18 @@ if (el.btnOpenGenresModal) {
 // Category Chips
 el.filterChips.forEach(chip => {
   chip.onclick = () => {
-    el.filterChips.forEach(c => c.classList.remove('active'));
-    chip.classList.add('active');
-
     const sort = chip.dataset.sort;
     const genre = chip.dataset.genre;
     const status = chip.dataset.status;
 
-    switchView('home');
     if (genre) {
-      loadHome(1, 0, genre);
+      navigateTo(`#genre/${encodeURIComponent(genre)}`);
     } else if (status) {
-      loadHome(1, 0, '', parseInt(status, 10));
+      navigateTo(`#home?status=${status}`);
+    } else if (sort && sort !== '0') {
+      navigateTo(`#home?sort=${sort}`);
     } else {
-      loadHome(1, sort ? parseInt(sort, 10) : 0, '');
+      navigateTo('#home');
     }
   };
 });
@@ -1527,13 +1544,8 @@ window.addEventListener('keydown', (e) => {
 document.querySelectorAll('.mobile-bottom-nav .m-nav-item').forEach(btn => {
   btn.onclick = () => {
     const tab = btn.dataset.tab;
-    if (tab === 'home') {
-      loadHome(1, 0, '');
-      switchView('home');
-    } else if (tab === 'bookmarks') {
-      renderBookmarks();
-    } else if (tab === 'history') {
-      renderHistory();
+    if (tab) {
+      navigateTo(`#${tab}`);
     }
   };
 });
@@ -1590,10 +1602,124 @@ el.readerCanvas.addEventListener('click', (e) => {
   }
 });
 
+// ==================== SPA Hash Router ====================
+
+function navigateTo(hash) {
+  if (window.location.hash === hash) {
+    handleRoute();
+  } else {
+    window.location.hash = hash;
+  }
+}
+
+let isHandlingRoute = false;
+async function handleRoute() {
+  if (isHandlingRoute) return;
+  isHandlingRoute = true;
+  try {
+    const rawHash = (window.location.hash || '').replace(/^#\/?/, '');
+
+    if (rawHash.startsWith('read/')) {
+      const parts = rawHash.slice(5).split('/');
+      const comicSlug = decodeURIComponent(parts[0] || '');
+      const chapterSlug = decodeURIComponent(parts.slice(1).join('/') || '');
+      if (comicSlug && chapterSlug) {
+        await _loadChapter(comicSlug, chapterSlug);
+        return;
+      }
+    }
+
+    if (rawHash.startsWith('comic/')) {
+      const comicSlug = decodeURIComponent(rawHash.slice(6));
+      if (comicSlug) {
+        await _loadComicDetail(comicSlug);
+        return;
+      }
+    }
+
+    if (rawHash.startsWith('genre/')) {
+      const genreSlug = decodeURIComponent(rawHash.slice(6));
+      if (genreSlug) {
+        _loadGenreView(genreSlug);
+        return;
+      }
+    }
+
+    if (rawHash.startsWith('search/')) {
+      const keyword = decodeURIComponent(rawHash.slice(7));
+      if (keyword) {
+        _loadSearchView(keyword);
+        return;
+      }
+    }
+
+    if (rawHash === 'bookmarks') {
+      switchView('bookmarks');
+      renderBookmarks();
+      return;
+    }
+
+    if (rawHash === 'history') {
+      switchView('history');
+      renderHistory();
+      return;
+    }
+
+    // Default or #home or #home?...
+    const queryIdx = rawHash.indexOf('?');
+    const searchParamsStr = queryIdx !== -1 ? rawHash.slice(queryIdx + 1) : '';
+    _loadHomeView(searchParamsStr);
+
+  } finally {
+    isHandlingRoute = false;
+  }
+}
+
+function _loadGenreView(genreSlug, page = 1) {
+  el.filterChips.forEach(c => {
+    if (c.dataset.genre === genreSlug) {
+      c.classList.add('active');
+      c.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    } else {
+      c.classList.remove('active');
+    }
+  });
+  switchView('home');
+  loadHome(page, 0, genreSlug);
+}
+
+function _loadSearchView(keyword, page = 1) {
+  el.searchInput.value = keyword;
+  handleSearch(keyword, page);
+}
+
+function _loadHomeView(searchParamsStr = '') {
+  const params = new URLSearchParams(searchParamsStr);
+  const sort = parseInt(params.get('sort') || '0', 10);
+  const status = parseInt(params.get('status') || '0', 10);
+  const page = parseInt(params.get('page') || '1', 10);
+
+  el.filterChips.forEach(c => {
+    if (status && c.dataset.status == status) {
+      c.classList.add('active');
+    } else if (sort && c.dataset.sort == sort) {
+      c.classList.add('active');
+    } else if (!status && !sort && c.dataset.sort === '0') {
+      c.classList.add('active');
+    } else {
+      c.classList.remove('active');
+    }
+  });
+
+  switchView('home');
+  loadHome(page, sort, '', status);
+}
+
 // Initialize
 updateBookmarkBadge();
 setupGenresModal();
-loadHome(1, 0, '');
+window.addEventListener('hashchange', handleRoute);
+handleRoute();
 
 // Prevent accidental pinch-zoom & double-tap auto zoom on mobile touch
 document.addEventListener('gesturestart', (e) => { e.preventDefault(); }, { passive: false });
