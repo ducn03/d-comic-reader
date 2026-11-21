@@ -2522,3 +2522,84 @@ body:not(.in-reader) .reader-floating-dock {
     padding: 0 !important;
   }
 }
+
+/* ==================== iOS Standalone PWA (Home Screen) Notch & Safe Area ==================== */
+@media all and (display-mode: standalone) {
+  @media (max-width: 768px) {
+    .app-header {
+      padding-top: max(env(safe-area-inset-top, 0px), 47px) !important;
+      height: calc(58px + max(env(safe-area-inset-top, 0px), 47px)) !important;
+    }
+    .reader-toolbar {
+      padding-top: max(env(safe-area-inset-top, 0px), 47px) !important;
+      height: calc(54px + max(env(safe-area-inset-top, 0px), 47px)) !important;
+    }
+    .mobile-bottom-nav {
+      padding-bottom: max(env(safe-area-inset-bottom, 0px), 24px) !important;
+      height: calc(64px + max(env(safe-area-inset-bottom, 0px), 24px)) !important;
+    }
+    .reader-canvas {
+      padding-top: max(env(safe-area-inset-top, 0px), 16px) !important;
+    }
+    .read-progress {
+      top: max(env(safe-area-inset-top, 0px), 47px) !important;
+    }
+  }
+}
+
+html.standalone-ios .app-header {
+  padding-top: max(env(safe-area-inset-top, 0px), 47px) !important;
+  height: calc(58px + max(env(safe-area-inset-top, 0px), 47px)) !important;
+}
+
+html.standalone-ios .reader-toolbar {
+  padding-top: max(env(safe-area-inset-top, 0px), 47px) !important;
+  height: calc(54px + max(env(safe-area-inset-top, 0px), 47px)) !important;
+}
+
+html.standalone-ios .mobile-bottom-nav {
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 24px) !important;
+  height: calc(64px + max(env(safe-area-inset-bottom, 0px), 24px)) !important;
+}
+
+html.standalone-ios .reader-canvas {
+  padding-top: max(env(safe-area-inset-top, 0px), 16px) !important;
+}
+
+html.standalone-ios .chapter-drawer {
+  padding-top: max(env(safe-area-inset-top, 0px), 47px) !important;
+}
+
+html.standalone-ios .read-progress {
+  top: max(env(safe-area-inset-top, 0px), 47px) !important;
+}
+
+/* Dynamic Island devices (iPhone 14 Pro, 15, 15 Pro, 16, 16 Pro) require 56px-59px safe top */
+html.ios-dynamic-island.standalone-ios .app-header {
+  padding-top: max(env(safe-area-inset-top, 0px), 56px) !important;
+  height: calc(58px + max(env(safe-area-inset-top, 0px), 56px)) !important;
+}
+
+html.ios-dynamic-island.standalone-ios .reader-toolbar {
+  padding-top: max(env(safe-area-inset-top, 0px), 56px) !important;
+  height: calc(54px + max(env(safe-area-inset-top, 0px), 56px)) !important;
+}
+
+html.ios-dynamic-island.standalone-ios .chapter-drawer {
+  padding-top: max(env(safe-area-inset-top, 0px), 56px) !important;
+}
+
+html.ios-dynamic-island.standalone-ios .read-progress {
+  top: max(env(safe-area-inset-top, 0px), 56px) !important;
+}
+
+/* Landscape orientation on mobile notch phones */
+@media (orientation: landscape) and (max-width: 950px) {
+  html.standalone-ios .app-header,
+  html.standalone-ios .reader-toolbar {
+    padding-left: max(env(safe-area-inset-left, 0px), 20px) !important;
+    padding-right: max(env(safe-area-inset-right, 0px), 20px) !important;
+    padding-top: 0 !important;
+    height: 54px !important;
+  }
+}

@@ -3,6 +3,27 @@
  * Powered by Hinettruyen Crawler APIs
  */
 
+// Detect iPhone / iOS Standalone PWA (Added to Home Screen) for Notch / Dynamic Island Safe Area
+(function initIosStandaloneDetector() {
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const isStandalone = Boolean(
+    window.navigator.standalone === true || 
+    window.matchMedia('(display-mode: standalone)').matches
+  );
+
+  if (isStandalone) {
+    document.documentElement.classList.add('standalone-pwa');
+    if (isIOS) {
+      document.documentElement.classList.add('standalone-ios');
+      const maxDim = Math.max(window.screen.width, window.screen.height);
+      if (maxDim >= 852) {
+        document.documentElement.classList.add('ios-dynamic-island');
+      }
+    }
+  }
+})();
+
 const API_BASE = window.location.protocol === 'file:' 
   ? 'http://localhost:3000/api/manga' 
   : '/api/manga';
