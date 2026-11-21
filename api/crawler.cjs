@@ -520,6 +520,8 @@ async function getDetail(slug) {
 
   const actualSlug = cleanSlug(slug);
   let detail = null;
+  let qqError = null;
+  let ntError = null;
 
   // 1. Try TruyenQQ Primary
   try {
@@ -527,8 +529,11 @@ async function getDetail(slug) {
     const parsed = parseQQDetail(qqHtml, actualSlug);
     if (parsed && parsed.chapters.length > 0) {
       detail = parsed;
+    } else {
+      qqError = 'Chapters length is 0';
     }
   } catch (err) {
+    qqError = err.message;
     console.warn('TruyenQQ detail fallback to NetTruyen:', err.message);
   }
 
@@ -574,12 +579,13 @@ async function getDetail(slug) {
         chapters
       };
     } catch (err2) {
+      ntError = err2.message;
       console.warn('NetTruyen detail failed:', err2.message);
     }
   }
 
   if (!detail) {
-    throw new Error(`Comic '${slug}' not found on any source`);
+    throw new Error(`Comic '${slug}' not found. TruyenQQ error: ${qqError || 'none'} | NetTruyen error: ${ntError || 'none'}`);
   }
 
   setCache(cacheKey, detail);
