@@ -79,6 +79,23 @@ module.exports = async (req, res) => {
   };
 
   try {
+    if (endpoint === 'test') {
+      const resp = await fetch('https://truyenqq.com.vn', {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+        }
+      });
+      const text = await resp.text();
+      sendJson(200, {
+        status: resp.status,
+        server: resp.headers.get('server'),
+        cfRay: resp.headers.get('cf-ray'),
+        body: text.slice(0, 300)
+      }, 0);
+      return;
+    }
+
     if (endpoint === 'probe') {
       const domains = [
         'https://truyenqq.com.vn',
