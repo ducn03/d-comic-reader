@@ -126,6 +126,7 @@ const el = {
 
   // Home
   filterChips: document.querySelectorAll('.filter-chip'),
+  featuredSection: document.getElementById('featured-section'),
   featuredCard: document.getElementById('featured-card'),
   featuredBg: document.getElementById('featured-bg'),
   featuredCoverImg: document.getElementById('featured-cover-img'),
@@ -373,19 +374,28 @@ async function loadHome(page = 1, sort = 0, genre = '', status = 0) {
       el.homeSectionTitle.textContent = `${gItem ? gItem.icon : '🏷️'} Thể loại: ${gItem ? gItem.name : genre}`;
     } else if (status == 2) {
       el.homeSectionTitle.textContent = '🏆 Danh Sách Truyện Đã Hoàn Thành (Full)';
-    } else if (sort == 10) {
-      el.homeSectionTitle.textContent = '👑 Top Truyện Đọc Nhiều Nhất';
+    } else if (sort == 10 || sort == 1) {
+      el.homeSectionTitle.textContent = '🔥 Top Truyện Được Xem Nhiều Nhất';
     } else if (sort == 11) {
-      el.homeSectionTitle.textContent = '📅 Top Truyện Được Xem Nhiều Tháng Này';
+      el.homeSectionTitle.textContent = '📅 Top Truyện Được Xem Nhiều Trong Tháng';
+    } else if (sort == 12) {
+      el.homeSectionTitle.textContent = '⭐ Top Truyện Được Xem Nhiều Trong Tuần';
     } else if (sort == 20) {
-      el.homeSectionTitle.textContent = '❤️ Truyện Được Độc Giả Yêu Thích';
+      el.homeSectionTitle.textContent = '❤️ Top Truyện Được Độc Giả Yêu Thích';
     } else {
       el.homeSectionTitle.textContent = 'Danh Sách Truyện Mới Cập Nhật';
     }
 
     el.comicsCountPill.textContent = `${data.comics.length} truyện`;
 
-    if (data.comics.length > 0 && page === 1 && !genre && !status) {
+    if (el.featuredSection) {
+      if (data.comics.length > 0 && page === 1 && !genre && !status && (!sort || sort === 0)) {
+        el.featuredSection.classList.remove('hidden');
+        setupFeaturedManga(data.comics[0]);
+      } else {
+        el.featuredSection.classList.add('hidden');
+      }
+    } else if (data.comics.length > 0 && page === 1 && !genre && !status && (!sort || sort === 0)) {
       setupFeaturedManga(data.comics[0]);
     }
 
@@ -1439,20 +1449,33 @@ el.filterChips.forEach(chip => {
 });
 
 // Pagination
-el.btnPrevPage.onclick = () => {
+function changePage(delta) {
   if (state.searchKeyword) {
-    handleSearch(state.searchKeyword, state.searchPage - 1);
+    const targetPage = Math.max(1, (state.searchPage || 1) + delta);
+    navigateTo(`#search/${encodeURIComponent(state.searchKeyword)}?page=${targetPage}`);
+  } else if (state.homeGenre) {
+    const targetPage = Math.max(1, (state.homePage || 1) + delta);
+    navigateTo(`#genre/${encodeURIComponent(state.homeGenre)}?page=${targetPage}`);
   } else {
-    loadHome(state.homePage - 1, state.homeSort, state.homeGenre, state.homeStatus);
+    const targetPage = Math.max(1, (state.homePage || 1) + delta);
+    let hash = `#home?page=${targetPage}`;
+    if (state.homeSort) hash += `&sort=${state.homeSort}`;
+    if (state.homeStatus) hash += `&status=${state.homeStatus}`;
+    navigateTo(hash);
   }
-};
-el.btnNextPage.onclick = () => {
-  if (state.searchKeyword) {
-    handleSearch(state.searchKeyword, state.searchPage + 1);
+
+  // Smooth scroll back up to the top of the comic grid
+  const scrollAnchor = document.querySelector('.category-chips-wrapper') || el.homeSectionTitle || el.comicsGrid;
+  if (scrollAnchor) {
+    const topOffset = scrollAnchor.getBoundingClientRect().top + window.pageYOffset - 70;
+    window.scrollTo({ top: Math.max(0, topOffset), behavior: 'smooth' });
   } else {
-    loadHome(state.homePage + 1, state.homeSort, state.homeGenre, state.homeStatus);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
-};
+}
+
+el.btnPrevPage.onclick = () => changePage(-1);
+el.btnNextPage.onclick = () => changePage(1);
 
 // Detail Favorite Toggle
 el.btnFavoriteToggle.onclick = () => {
@@ -1659,17 +1682,35 @@ async function handleRoute() {
     }
 
     if (rawHash.startsWith('genre/')) {
-      const genreSlug = decodeURIComponent(rawHash.slice(6));
+      const rest = rawHash.slice(6);
+      const qIdx = rest.indexOf('?');
+      let genreSlug = rest;
+      let page = 1;
+      if (qIdx !== -1) {
+        genreSlug = rest.slice(0, qIdx);
+        const params = new URLSearchParams(rest.slice(qIdx + 1));
+        page = parseInt(params.get('page') || '1', 10);
+      }
+      genreSlug = decodeURIComponent(genreSlug);
       if (genreSlug) {
-        _loadGenreView(genreSlug);
+        _loadGenreView(genreSlug, page);
         return;
       }
     }
 
     if (rawHash.startsWith('search/')) {
-      const keyword = decodeURIComponent(rawHash.slice(7));
+      const rest = rawHash.slice(7);
+      const qIdx = rest.indexOf('?');
+      let keyword = rest;
+      let page = 1;
+      if (qIdx !== -1) {
+        keyword = rest.slice(0, qIdx);
+        const params = new URLSearchParams(rest.slice(qIdx + 1));
+        page = parseInt(params.get('page') || '1', 10);
+      }
+      keyword = decodeURIComponent(keyword);
       if (keyword) {
-        _loadSearchView(keyword);
+        _loadSearchView(keyword, page);
         return;
       }
     }
@@ -1710,6 +1751,7 @@ function _loadGenreView(genreSlug, page = 1) {
 }
 
 function _loadSearchView(keyword, page = 1) {
+  el.filterChips.forEach(c => c.classList.remove('active'));
   el.searchInput.value = keyword;
   handleSearch(keyword, page);
 }
