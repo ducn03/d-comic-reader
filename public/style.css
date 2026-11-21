@@ -61,15 +61,37 @@ body.filter-oled .mobile-bottom-nav {
   -webkit-tap-highlight-color: transparent;
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  touch-action: pan-x pan-y;
+  height: 100%;
+}
+
 body {
   background-color: var(--bg-primary);
   color: var(--text-main);
   font-family: var(--font-family);
   min-height: 100vh;
+  min-height: -webkit-fill-available;
   line-height: 1.5;
   overflow-x: hidden;
   transition: background-color 0.25s ease;
-  touch-action: manipulation;
+  touch-action: pan-x pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Allow text selection in search and chapter title */
+input, textarea, .comic-synopsis, .detail-synopsis {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* Prevent auto-zoom on iOS when focusing inputs */
+input, select, textarea {
+  font-size: 16px !important;
 }
 
 /* Scrollbars - Cleaned up */
@@ -134,6 +156,20 @@ body {
   -webkit-backdrop-filter: blur(20px);
   border-bottom: 1px solid var(--border-subtle);
   z-index: 900;
+}
+
+/* PWA Fullscreen Safe Area (Notch / Home Bar) */
+@supports (padding-top: env(safe-area-inset-top)) {
+  .app-header {
+    height: calc(var(--header-height) + env(safe-area-inset-top, 0px));
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  .mobile-bottom-nav {
+    padding-bottom: max(8px, env(safe-area-inset-bottom, 0px));
+  }
+  .reader-toolbar {
+    padding-top: max(8px, env(safe-area-inset-top, 0px));
+  }
 }
 
 .header-container {
@@ -2171,7 +2207,7 @@ body:not(.in-reader) .reader-floating-dock {
   }
 
   .search-input-group input {
-    font-size: 12px;
+    font-size: 16px;
     min-width: 0;
   }
 

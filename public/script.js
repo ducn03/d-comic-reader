@@ -1594,3 +1594,19 @@ el.readerCanvas.addEventListener('click', (e) => {
 updateBookmarkBadge();
 setupGenresModal();
 loadHome(1, 0, '');
+
+// Prevent accidental pinch-zoom & double-tap auto zoom on mobile touch
+document.addEventListener('gesturestart', (e) => { e.preventDefault(); }, { passive: false });
+document.addEventListener('gesturechange', (e) => { e.preventDefault(); }, { passive: false });
+document.addEventListener('gestureend', (e) => { e.preventDefault(); }, { passive: false });
+
+let lastTouchEnd = 0;
+document.addEventListener('touchend', (event) => {
+  const now = Date.now();
+  if (now - lastTouchEnd <= 300) {
+    if (!event.target.closest('button, .chapter-btn, a, input, select, textarea, .genre-chip, .comic-card, .btn-icon')) {
+      event.preventDefault();
+    }
+  }
+  lastTouchEnd = now;
+}, { passive: false });
