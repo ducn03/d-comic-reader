@@ -257,9 +257,9 @@ async function fetchCached(url, ttlMs = 180000) {
 
 function getProxyImageUrl(rawUrl) {
   if (!rawUrl) return '/assets/images/thumb-default.jpg';
-  // Direct fast Cloudflare CDN loading with 0 server delay
+  // Direct fast CDN loading with 0 server delay for supported hosts
   if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
-    if (rawUrl.includes('khotruyen.site') || rawUrl.includes('img.otruyenapi.com') || rawUrl.includes('storage/thumbnails')) {
+    if (rawUrl.includes('khotruyen.site') || rawUrl.includes('img.otruyenapi.com') || rawUrl.includes('storage/thumbnails') || rawUrl.includes('truyenqq.com.vn/media/book')) {
       return rawUrl;
     }
   }
