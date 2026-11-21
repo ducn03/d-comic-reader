@@ -95,13 +95,20 @@ const server = http.createServer(async (req, res) => {
 
   if (endpoint && ['home', 'search', 'genre', 'detail', 'chapter', 'image'].includes(endpoint)) {
     try {
+      const sendApi = (status, data, maxAge = 120) => {
+        res.writeHead(status, {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Cache-Control': status === 200 ? `public, max-age=${maxAge}, s-maxage=${maxAge * 3}, stale-while-revalidate=86400` : 'no-cache, no-store'
+        });
+        res.end(JSON.stringify(data));
+      };
+
       if (endpoint === 'home') {
         const page = parseInt(urlObj.searchParams.get('page') || '1', 10);
         const sort = parseInt(urlObj.searchParams.get('sort') || '0', 10);
         const status = parseInt(urlObj.searchParams.get('status') || '0', 10);
         const data = await crawler.getHome(page, sort, status);
-        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-        res.end(JSON.stringify(data));
+        sendApi(200, data, 180);
         return;
       }
 
@@ -109,8 +116,7 @@ const server = http.createServer(async (req, res) => {
         const q = urlObj.searchParams.get('q') || '';
         const page = parseInt(urlObj.searchParams.get('page') || '1', 10);
         const data = await crawler.searchManga(q, page);
-        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-        res.end(JSON.stringify(data));
+        sendApi(200, data, 180);
         return;
       }
 
@@ -118,16 +124,14 @@ const server = http.createServer(async (req, res) => {
         const slug = urlObj.searchParams.get('slug') || '';
         const page = parseInt(urlObj.searchParams.get('page') || '1', 10);
         const data = await crawler.getGenre(slug, page);
-        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-        res.end(JSON.stringify(data));
+        sendApi(200, data, 300);
         return;
       }
 
       if (endpoint === 'detail') {
         const slug = urlObj.searchParams.get('slug') || '';
         const data = await crawler.getDetail(slug);
-        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-        res.end(JSON.stringify(data));
+        sendApi(200, data, 300);
         return;
       }
 
@@ -135,8 +139,7 @@ const server = http.createServer(async (req, res) => {
         const slug = urlObj.searchParams.get('slug') || '';
         const chapter = urlObj.searchParams.get('chapter') || '';
         const data = await crawler.getChapter(slug, chapter);
-        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-        res.end(JSON.stringify(data));
+        sendApi(200, data, 1800);
         return;
       }
 

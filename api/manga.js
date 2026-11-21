@@ -60,13 +60,21 @@ module.exports = async (req, res) => {
     endpoint = endpoint.replace(/^\/+|\/+$/g, '').trim();
   }
 
-  const sendJson = (status, data) => {
+  const sendJson = (status, data, maxAge = 120) => {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    if (status === 200) {
+      res.setHeader('Cache-Control', `public, max-age=${maxAge}, s-maxage=${maxAge * 3}, stale-while-revalidate=86400`);
+    } else {
+      res.setHeader('Cache-Control', 'no-cache, no-store');
+    }
     if (typeof res.status === 'function' && typeof res.json === 'function') {
-      res.setHeader('Content-Type', 'application/json; charset=utf-8');
       res.status(status).json(data);
       return;
     }
-    res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.writeHead(status, {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Cache-Control': status === 200 ? `public, max-age=${maxAge}, s-maxage=${maxAge * 3}, stale-while-revalidate=86400` : 'no-cache, no-store'
+    });
     res.end(JSON.stringify(data));
   };
 
@@ -76,7 +84,7 @@ module.exports = async (req, res) => {
       const sort = parseInt(getParam('sort') || '0', 10);
       const status = parseInt(getParam('status') || '0', 10);
       const data = await crawler.getHome(page, sort, status);
-      sendJson(200, data);
+      sendJson(200, data, 180);
       return;
     }
 
@@ -84,7 +92,7 @@ module.exports = async (req, res) => {
       const q = getParam('q');
       const page = parseInt(getParam('page') || '1', 10);
       const data = await crawler.searchManga(q, page);
-      sendJson(200, data);
+      sendJson(200, data, 180);
       return;
     }
 
@@ -92,14 +100,14 @@ module.exports = async (req, res) => {
       const slug = getParam('slug');
       const page = parseInt(getParam('page') || '1', 10);
       const data = await crawler.getGenre(slug, page);
-      sendJson(200, data);
+      sendJson(200, data, 300);
       return;
     }
 
     if (endpoint === 'detail') {
       const slug = getParam('slug');
       const data = await crawler.getDetail(slug);
-      sendJson(200, data);
+      sendJson(200, data, 300);
       return;
     }
 
@@ -107,7 +115,7 @@ module.exports = async (req, res) => {
       const slug = getParam('slug');
       const chapter = getParam('chapter');
       const data = await crawler.getChapter(slug, chapter);
-      sendJson(200, data);
+      sendJson(200, data, 1800);
       return;
     }
 

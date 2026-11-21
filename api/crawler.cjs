@@ -8,15 +8,15 @@ const { URL } = require('url');
 
 const MIRROR_DOMAINS = [
   'https://nettruyentv.me',
-  'https://nettruyen.info',
-  'https://hinettruyen.com'
+  'https://nettruyenbb.com',
+  'https://nettruyen.info'
 ];
 let BASE_URL = MIRROR_DOMAINS[0];
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
 
 // In-Memory Fast Cache with TTL
 const memoryCache = new Map();
-function getCache(key, ttlSeconds = 60) {
+function getCache(key, ttlSeconds = 300) {
   const item = memoryCache.get(key);
   if (!item) return null;
   if (Date.now() - item.time > ttlSeconds * 1000) {
@@ -27,7 +27,7 @@ function getCache(key, ttlSeconds = 60) {
 }
 
 function setCache(key, data) {
-  if (memoryCache.size > 250) {
+  if (memoryCache.size > 500) {
     const firstKey = memoryCache.keys().next().value;
     memoryCache.delete(firstKey);
   }
@@ -271,9 +271,11 @@ async function getDetail(slug) {
   const descMatch = html.match(/<div class="detail-content">[\s\S]*?<p>([\s\S]*?)<\/p>/i);
   const description = descMatch ? descMatch[1].replace(/<[^>]+>/g, '\n').trim() : '';
 
-  // Chapters
+  // Chapters - optimize regex by restricting search to chapter container
   let chapters = [];
-  const chapMatches = [...html.matchAll(/<div class="col-xs-5 chapter">[\s\S]*?<a[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?<div class="col-xs-4[^>]*>([\s\S]*?)<\/div>/gi)];
+  const listStart = html.indexOf('id="nt_listchapter"');
+  const chapterBlock = listStart !== -1 ? html.slice(listStart) : html;
+  const chapMatches = [...chapterBlock.matchAll(/<div class="col-xs-5 chapter">[\s\S]*?<a[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?<div class="col-xs-4[^>]*>([\s\S]*?)<\/div>/gi)];
   for (const cm of chapMatches) {
     const cUrl = cm[1].trim();
     const cSlug = cUrl.split('/').filter(Boolean).pop();
@@ -305,7 +307,7 @@ async function getDetail(slug) {
 
 async function getChapter(slug, chapterSlug) {
   const cacheKey = `chapter_${slug}_${chapterSlug}`;
-  const cached = getCache(cacheKey, 600);
+  const cached = getCache(cacheKey, 3600);
   if (cached) return cached;
 
   let url = BASE_URL.includes('nettruyentv')

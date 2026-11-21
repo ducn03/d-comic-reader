@@ -214,6 +214,39 @@ const el = {
   toastContainer: document.getElementById('toast-container')
 };
 
+// ==================== High-Speed Client Cache (RAM + SessionStorage) ====================
+const clientCache = new Map();
+
+async function fetchCached(url, ttlMs = 180000) {
+  const now = Date.now();
+  const memoryItem = clientCache.get(url);
+  if (memoryItem && (now - memoryItem.time < ttlMs)) {
+    return memoryItem.data;
+  }
+  try {
+    const sItem = sessionStorage.getItem('mf_c_' + url);
+    if (sItem) {
+      const parsed = JSON.parse(sItem);
+      if (now - parsed.time < ttlMs) {
+        clientCache.set(url, parsed);
+        return parsed.data;
+      }
+    }
+  } catch (e) {}
+
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+  const entry = { time: now, data };
+  clientCache.set(url, entry);
+  try {
+    sessionStorage.setItem('mf_c_' + url, JSON.stringify(entry));
+  } catch (e) {
+    try { sessionStorage.clear(); } catch (_) {}
+  }
+  return data;
+}
+
 // ==================== Utilities ====================
 
 function getProxyImageUrl(rawUrl) {
@@ -318,8 +351,7 @@ async function loadHome(page = 1, sort = 0, genre = '', status = 0) {
     if (status) url += `&status=${status}`;
     if (genre) url = `${API_BASE}/genre?slug=${encodeURIComponent(genre)}&page=${page}`;
 
-    const res = await fetch(url);
-    const data = await res.json();
+    const data = await fetchCached(url, 180000);
 
     if (!data || !data.comics) {
       showToast('Không thể tải truyện lúc này!');
@@ -545,8 +577,7 @@ async function handleSearch(keyword, page = 1) {
   renderSkeletonGrid(el.comicsGrid, 12);
 
   try {
-    const res = await fetch(`${API_BASE}/search?q=${encodeURIComponent(state.searchKeyword)}&page=${page}`);
-    const data = await res.json();
+    const data = await fetchCached(`${API_BASE}/search?q=${encodeURIComponent(state.searchKeyword)}&page=${page}`, 180000);
 
     el.homeSectionTitle.textContent = `Kết Quả Tìm Kiếm: "${state.searchKeyword}"`;
     el.comicsCountPill.textContent = `${data.comics ? data.comics.length : 0} kết quả`;
@@ -565,10 +596,14 @@ async function handleSearch(keyword, page = 1) {
 // ==================== Comic Detail View ====================
 
 async function openComicDetail(slug) {
-  showSpinner('Đang tải thông tin truyện & danh sách chương...');
+  const detailUrl = `${API_BASE}/detail?slug=${encodeURIComponent(slug)}`;
+  const isPrecached = clientCache.has(detailUrl);
+  if (!isPrecached) {
+    showSpinner('Đang tải thông tin truyện & danh sách chương...');
+  }
+
   try {
-    const res = await fetch(`${API_BASE}/detail?slug=${encodeURIComponent(slug)}`);
-    const detail = await res.json();
+    const detail = await fetchCached(detailUrl, 300000);
     hideSpinner();
 
     if (!detail || !detail.title) {
@@ -644,16 +679,50 @@ function renderChapterButtons(filterText = '') {
   }
 
   const readSet = new Set(state.readChapters[state.currentComic.slug] || []);
+  const fragment = document.createDocumentFragment();
 
-  list.forEach(ch => {
+  // If over 120 chapters and not searching, render first 120 with one-click expand to avoid UI freeze
+  const isFiltering = Boolean(filterText.trim());
+  const displayLimit = isFiltering ? list.length : Math.min(list.length, 120);
+
+  for (let i = 0; i < displayLimit; i++) {
+    const ch = list[i];
     const btn = document.createElement('div');
     const isRead = readSet.has(ch.chapterSlug);
     btn.className = `chapter-btn ${isRead ? 'is-read' : ''}`;
     btn.textContent = ch.name;
     btn.title = `${ch.name} (${ch.time || ''})`;
     btn.onclick = () => openChapter(state.currentComic.slug, ch.chapterSlug);
-    el.detailChaptersList.appendChild(btn);
-  });
+    fragment.appendChild(btn);
+  }
+
+  el.detailChaptersList.appendChild(fragment);
+
+  if (!isFiltering && list.length > displayLimit) {
+    const moreBtn = document.createElement('button');
+    moreBtn.className = 'btn btn-outline';
+    moreBtn.style.gridColumn = '1 / -1';
+    moreBtn.style.margin = '12px auto';
+    moreBtn.style.padding = '10px 24px';
+    moreBtn.style.borderRadius = '24px';
+    moreBtn.textContent = `Xem toàn bộ ${list.length} chương (+${list.length - displayLimit} chương)`;
+    moreBtn.onclick = () => {
+      moreBtn.remove();
+      const moreFrag = document.createDocumentFragment();
+      for (let i = displayLimit; i < list.length; i++) {
+        const ch = list[i];
+        const btn = document.createElement('div');
+        const isRead = readSet.has(ch.chapterSlug);
+        btn.className = `chapter-btn ${isRead ? 'is-read' : ''}`;
+        btn.textContent = ch.name;
+        btn.title = `${ch.name} (${ch.time || ''})`;
+        btn.onclick = () => openChapter(state.currentComic.slug, ch.chapterSlug);
+        moreFrag.appendChild(btn);
+      }
+      el.detailChaptersList.appendChild(moreFrag);
+    };
+    el.detailChaptersList.appendChild(moreBtn);
+  }
 }
 
 function updateFavoriteButtonState(isFav) {
@@ -676,19 +745,24 @@ async function openChapter(slug, chapterSlug) {
   state.pagedCurrentIndex = 0;
 
   switchView('reader');
-  el.readerLoading.classList.remove('hidden');
-  el.readerImagesContainer.innerHTML = '';
   window.scrollTo({ top: 0, behavior: 'instant' });
 
+  const chapterUrl = `${API_BASE}/chapter?slug=${encodeURIComponent(slug)}&chapter=${encodeURIComponent(chapterSlug)}`;
+  const isPrecached = clientCache.has(chapterUrl);
+  if (!isPrecached) {
+    el.readerLoading.classList.remove('hidden');
+    el.readerImagesContainer.innerHTML = '';
+  }
+
   try {
-    const res = await fetch(`${API_BASE}/chapter?slug=${encodeURIComponent(slug)}&chapter=${encodeURIComponent(chapterSlug)}`);
-    const data = await res.json();
+    const data = await fetchCached(chapterUrl, 1800000);
     el.readerLoading.classList.add('hidden');
+    el.readerImagesContainer.innerHTML = '';
 
     if (!data || !data.images || data.images.length === 0) {
       el.readerImagesContainer.innerHTML = `
         <div style="padding: 40px; text-align: center; color: #ff5277; background: rgba(255,42,85,0.1); border-radius: 12px;">
-          <p style="font-size: 16px; margin-bottom: 12px;">Không thể tải hình ảnh chương truyện từ Hinettruyen!</p>
+          <p style="font-size: 16px; margin-bottom: 12px;">Không thể tải hình ảnh chương truyện lúc này!</p>
           <button class="btn btn-primary" onclick="openChapter('${slug}', '${chapterSlug}')">Thử Lại</button>
         </div>
       `;
@@ -713,6 +787,12 @@ async function openChapter(slug, chapterSlug) {
       el.btnBottomNext.disabled = false;
       el.btnReaderNext.onclick = () => openChapter(slug, data.nextChapterSlug);
       el.btnBottomNext.onclick = () => openChapter(slug, data.nextChapterSlug);
+
+      // PREFETCH NEXT CHAPTER IN BACKGROUND (0ms transition when user finishes current chapter)
+      setTimeout(() => {
+        const nextUrl = `${API_BASE}/chapter?slug=${encodeURIComponent(slug)}&chapter=${encodeURIComponent(data.nextChapterSlug)}`;
+        fetchCached(nextUrl, 1800000).catch(() => {});
+      }, 1000);
     }
 
     if (!data.prevChapterSlug) {
@@ -735,7 +815,8 @@ async function openChapter(slug, chapterSlug) {
       const img = document.createElement('img');
       img.className = 'reader-page-img';
       img.alt = `Trang ${idx + 1}`;
-      img.loading = idx < 3 ? 'eager' : 'lazy';
+      img.loading = idx < 2 ? 'eager' : 'lazy';
+      if (idx < 2) img.setAttribute('fetchpriority', 'high');
       img.src = getProxyImageUrl(imgUrl);
 
       img.onerror = () => {
