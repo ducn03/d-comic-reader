@@ -1,22 +1,40 @@
 /**
  * Crawler & API Module for NetTruyen & Hinettruyen
- * Multi-domain fallback to bypass datacenter blocks
+ * Multi-domain fallback to bypass datacenter blocks & real-time chapter sync
  */
 const https = require('https');
 const http = require('http');
 const { URL } = require('url');
 
 const MIRROR_DOMAINS = [
-  'https://nettruyentv.me',
+  'https://hinettruyen.com',
+  'https://gonettruyen.com',
   'https://nettruyenbb.com',
-  'https://nettruyen.info'
+  'https://nettruyentv.me'
 ];
 let BASE_URL = MIRROR_DOMAINS[0];
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
 
+const GENRE_MAP = {
+  'action': 'action-95',
+  'comedy': 'comedy-99',
+  'drama': 'drama-103',
+  'fantasy': 'fantasy-105',
+  'manga': 'manga-112',
+  'manhwa': 'manhwa-11400',
+  'romance': 'romance-121',
+  'shoujo-ai': 'shoujo-ai-126',
+  'shounen': 'shounen-127',
+  'tragedy': 'tragedy-136',
+  'chuyen-sinh': 'chuyen-sinh-2130',
+  'co-dai': 'co-dai-207',
+  'xuyen-khong': 'xuyen-khong-205',
+  'mecha': 'mecha-117'
+};
+
 // In-Memory Fast Cache with TTL
 const memoryCache = new Map();
-function getCache(key, ttlSeconds = 300) {
+function getCache(key, ttlSeconds = 180) {
   const item = memoryCache.get(key);
   if (!item) return null;
   if (Date.now() - item.time > ttlSeconds * 1000) {
@@ -32,6 +50,11 @@ function setCache(key, data) {
     memoryCache.delete(firstKey);
   }
   memoryCache.set(key, { time: Date.now(), data });
+}
+
+function cleanSlug(slug) {
+  if (!slug) return '';
+  return slug.replace(/-\d+(?:-\d+)*$/, '');
 }
 
 async function fetchHtml(targetUrl) {
@@ -64,7 +87,7 @@ async function fetchHtml(targetUrl) {
     }
 
     try {
-      const res = await fetch(url, { headers: { ...headers, 'Referer': domain + '/' } });
+      const res = await fetch(url, { headers: { ...headers, 'Referer': domain + '/' }, redirect: 'follow' });
       const text = await res.text();
       if (res.ok && !text.includes('Just a moment...') && !text.includes('cf-browser-verification')) {
         BASE_URL = domain;
@@ -106,7 +129,7 @@ function parseComicsList(html) {
     const slug = extractSlug(fullUrl);
 
     // Cover Image
-    const imgMatch = block.match(/<img[^>]*?(?:data-src|data-original|data-retries|src)="([^"]+)"/i);
+    const imgMatch = block.match(/<img[^>]*?(?:data-src|data-original|data-retries|src)=['"]([^'"]+)['"]/i);
     let cover = imgMatch ? imgMatch[1].trim().replace(/&amp;/g, '&') : '';
     if (cover.startsWith('//')) cover = 'https:' + cover;
 
@@ -121,6 +144,7 @@ function parseComicsList(html) {
     const chapters = [];
     const chapMatches = [
       ...block.matchAll(/<li class="chapter clearfix">[\s\S]*?<a[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?<i class="time">([\s\S]*?)<\/i>/gi),
+      ...block.matchAll(/<a[^>]*href="([^"]+)"[^>]*title="([^"]*Chapter[^"]*|[^"]*Chap[^"]*)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?<i class="time">([\s\S]*?)<\/i>/gi),
       ...block.matchAll(/<a[^>]*href="([^"]+)"[^>]*title="([^"]*Chapter[^"]*|[^"]*Chap[^"]*)"[^>]*>([\s\S]*?)<\/a>/gi)
     ];
     for (const cm of chapMatches) {
@@ -170,19 +194,24 @@ function parseComicsList(html) {
 
 async function getHome(page = 1, sort = 0, status = 0) {
   const cacheKey = `home_${page}_${sort}_${status}`;
-  const cached = getCache(cacheKey, 120);
+  const cached = getCache(cacheKey, 60);
   if (cached) return cached;
 
   let url;
-  if (BASE_URL.includes('nettruyentv')) {
-    url = page > 1 ? `${BASE_URL}/?page=${page}` : `${BASE_URL}/`;
-  } else {
+  if (page === 1 && !sort && !status) {
     url = `${BASE_URL}/trang-chu/`;
-    if (page > 1 || sort || status) {
-      url = `${BASE_URL}/tim-truyen?page=${page}${sort ? `&sort=${sort}` : ''}${status ? `&status=${status}` : ''}`;
-    }
+  } else {
+    url = `${BASE_URL}/tim-truyen?page=${page}${sort ? `&sort=${sort}` : ''}${status ? `&status=${status}` : ''}`;
   }
-  const html = await fetchHtml(url);
+
+  let html;
+  try {
+    html = await fetchHtml(url);
+  } catch (err) {
+    // Fallback to / if /trang-chu/ failed
+    html = await fetchHtml(page > 1 ? `${BASE_URL}/?page=${page}` : `${BASE_URL}/`);
+  }
+
   const result = parseComicsList(html);
   setCache(cacheKey, result);
   return result;
@@ -193,10 +222,8 @@ async function searchManga(keyword, page = 1) {
   const cached = getCache(cacheKey, 120);
   if (cached) return cached;
 
-  const enc = encodeURIComponent(keyword);
-  let url = BASE_URL.includes('nettruyentv')
-    ? `${BASE_URL}/tim-kiem?keyword=${enc}&page=${page}`
-    : `${BASE_URL}/tim-truyen?keyword=${enc}&page=${page}`;
+  const enc = encodeURIComponent(keyword.trim());
+  const url = `${BASE_URL}/tim-truyen?keyword=${enc}&page=${page}`;
   const html = await fetchHtml(url);
   const result = parseComicsList(html);
   setCache(cacheKey, result);
@@ -208,10 +235,9 @@ async function getGenre(genreSlug, page = 1) {
   const cached = getCache(cacheKey, 180);
   if (cached) return cached;
 
-  const enc = encodeURIComponent(genreSlug);
-  let url = BASE_URL.includes('nettruyentv')
-    ? `${BASE_URL}/the-loai/${enc}?page=${page}`
-    : `${BASE_URL}/tim-truyen/${enc}?page=${page}`;
+  const mappedSlug = GENRE_MAP[genreSlug] || genreSlug;
+  const enc = encodeURIComponent(mappedSlug);
+  const url = `${BASE_URL}/tim-truyen/${enc}?page=${page}`;
   const html = await fetchHtml(url);
   const result = parseComicsList(html);
   setCache(cacheKey, result);
@@ -220,13 +246,23 @@ async function getGenre(genreSlug, page = 1) {
 
 async function getDetail(slug) {
   const cacheKey = `detail_${slug}`;
-  const cached = getCache(cacheKey, 300);
+  const cached = getCache(cacheKey, 180);
   if (cached) return cached;
 
-  let url = BASE_URL.includes('nettruyentv')
-    ? `${BASE_URL}/${slug}`
-    : `${BASE_URL}/truyen-tranh/${slug}`;
-  const html = await fetchHtml(url);
+  const clean = cleanSlug(slug);
+  let html;
+  let actualSlug = slug;
+
+  try {
+    html = await fetchHtml(`${BASE_URL}/truyen-tranh/${slug}`);
+  } catch (err) {
+    if (clean && clean !== slug) {
+      actualSlug = clean;
+      html = await fetchHtml(`${BASE_URL}/truyen-tranh/${clean}`);
+    } else {
+      throw err;
+    }
+  }
 
   // Title
   const titleMatch = html.match(/<h1 class="title-detail">([\s\S]*?)<\/h1>/i)
@@ -271,27 +307,55 @@ async function getDetail(slug) {
   const descMatch = html.match(/<div class="detail-content">[\s\S]*?<p>([\s\S]*?)<\/p>/i);
   const description = descMatch ? descMatch[1].replace(/<[^>]+>/g, '\n').trim() : '';
 
-  // Chapters - optimize regex by restricting search to chapter container
+  // Chapters: First try ultra-fast ChapterList API for all chapters up-to-date
   let chapters = [];
-  const listStart = html.indexOf('id="nt_listchapter"');
-  const chapterBlock = listStart !== -1 ? html.slice(listStart) : html;
-  const chapMatches = [...chapterBlock.matchAll(/<div class="col-xs-5 chapter">[\s\S]*?<a[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?<div class="col-xs-4[^>]*>([\s\S]*?)<\/div>/gi)];
-  for (const cm of chapMatches) {
-    const cUrl = cm[1].trim();
-    const cSlug = cUrl.split('/').filter(Boolean).pop();
-    chapters.push({
-      id: 0,
-      name: cm[2].replace(/<[^>]+>/g, '').trim(),
-      chapterSlug: cSlug,
-      time: cm[3].replace(/<[^>]+>/g, '').trim(),
-      url: cUrl
+  try {
+    const listApiUrl = `${BASE_URL}/Comic/Services/ComicService.asmx/ChapterList?slug=${encodeURIComponent(actualSlug)}`;
+    const apiRes = await fetch(listApiUrl, {
+      headers: {
+        'User-Agent': USER_AGENT,
+        'Referer': `${BASE_URL}/truyen-tranh/${actualSlug}`,
+        'X-Requested-With': 'XMLHttpRequest'
+      }
     });
+    if (apiRes.ok) {
+      const json = await apiRes.json();
+      if (json && Array.isArray(json.data) && json.data.length > 0) {
+        chapters = json.data.map(item => ({
+          id: item.chapter_id,
+          name: item.chapter_name,
+          chapterSlug: item.chapter_slug || `chuong-${item.chapter_num}`,
+          time: item.updated_at,
+          url: `/truyen-tranh/${actualSlug}/${item.chapter_slug || `chuong-${item.chapter_num}`}`
+        }));
+      }
+    }
+  } catch (e) {
+    console.warn('ChapterList API fallback:', e.message);
+  }
+
+  // Fallback to HTML parsing if API failed or empty
+  if (chapters.length === 0) {
+    const listStart = html.indexOf('id="chapter_list"');
+    const chapterBlock = listStart !== -1 ? html.slice(listStart) : html;
+    const chapMatches = [...chapterBlock.matchAll(/<div class="col-xs-5 chapter">[\s\S]*?<a[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?<div class="col-xs-4[^>]*>([\s\S]*?)<\/div>/gi)];
+    for (const cm of chapMatches) {
+      const cUrl = cm[1].trim();
+      const cSlug = cUrl.split('/').filter(Boolean).pop();
+      chapters.push({
+        id: 0,
+        name: cm[2].replace(/<[^>]+>/g, '').trim(),
+        chapterSlug: cSlug,
+        time: cm[3].replace(/<[^>]+>/g, '').trim(),
+        url: cUrl
+      });
+    }
   }
 
   const result = {
     title,
-    slug,
-    url,
+    slug: actualSlug,
+    url: `${BASE_URL}/truyen-tranh/${actualSlug}`,
     cover,
     author,
     status,
@@ -307,12 +371,11 @@ async function getDetail(slug) {
 
 async function getChapter(slug, chapterSlug) {
   const cacheKey = `chapter_${slug}_${chapterSlug}`;
-  const cached = getCache(cacheKey, 3600);
+  const cached = getCache(cacheKey, 1800);
   if (cached) return cached;
 
-  let url = BASE_URL.includes('nettruyentv')
-    ? `${BASE_URL}/${slug}/${chapterSlug}`
-    : `${BASE_URL}/truyen-tranh/${slug}/${chapterSlug}`;
+  const actualSlug = cleanSlug(slug);
+  const url = `${BASE_URL}/truyen-tranh/${actualSlug}/${chapterSlug}`;
   const html = await fetchHtml(url);
 
   // Comic Title & Chapter Title
@@ -320,9 +383,9 @@ async function getChapter(slug, chapterSlug) {
   const comicTitle = breadcrumbs.length > 1 ? breadcrumbs[breadcrumbs.length - 2][1].trim() : slug;
   const currentChapter = breadcrumbs.length > 0 ? breadcrumbs[breadcrumbs.length - 1][1].trim() : chapterSlug;
 
-  // Chapter Images
+  // Chapter Images - support both single and double quotes for lozad/data-src
   const images = [];
-  const imgMatches = [...html.matchAll(/<div class="page-chapter">[\s\S]*?<img[^>]*?(?:data-src|data-original|src)="([^"]+)"/gi)];
+  const imgMatches = [...html.matchAll(/<div[^>]*class=['"]?page-chapter['"]?[^>]*>[\s\S]*?<img[^>]*?(?:data-src|data-original|data-sv1|src)=['"]([^'"]+)['"]/gi)];
   for (const im of imgMatches) {
     let src = im[1].trim().replace(/&amp;/g, '&');
     if (src && !src.includes('logo') && !src.includes('brandview') && !src.includes('banner')) {
@@ -342,7 +405,7 @@ async function getChapter(slug, chapterSlug) {
 
   const chapterResult = {
     comicTitle,
-    comicSlug: slug,
+    comicSlug: actualSlug,
     currentChapter,
     chapterSlug,
     images,
