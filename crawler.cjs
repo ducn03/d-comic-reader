@@ -782,7 +782,20 @@ function proxyImageStream(imageUrl, clientRes) {
       }
     };
 
+    clientRes.on('close', () => {
+      try { req.destroy(); } catch (_) {}
+    });
+    clientRes.on('error', () => {
+      try { req.destroy(); } catch (_) {}
+    });
+
     const req = client.request(options, (remoteRes) => {
+      remoteRes.on('error', (err) => {
+        if (!clientRes.headersSent) {
+          try { clientRes.writeHead(502); clientRes.end(err.message); } catch (_) {}
+        }
+      });
+
       if (remoteRes.statusCode >= 400) {
         clientRes.writeHead(remoteRes.statusCode, { 'Content-Type': 'text/plain' });
         remoteRes.pipe(clientRes);

@@ -9,6 +9,13 @@ const os = require('os');
 const { URL } = require('url');
 const crawler = require('./crawler.cjs');
 
+process.on('uncaughtException', (err) => {
+  console.error('Server process caught unhandled exception:', err.message);
+});
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Server process caught unhandled rejection:', reason);
+});
+
 let PORT = parseInt(process.env.PORT || '3000', 10);
 const PUBLIC_DIR = fs.existsSync(path.join(__dirname, 'public'))
   ? path.join(__dirname, 'public')
@@ -200,7 +207,7 @@ function startServer(port) {
     PORT = port;
     const ip = getLocalIP();
     console.log('===========================================================');
-    console.log('📖 MANGAFLOW - WEB DOC TRUYEN (CRAWL HINETTRUYEN.COM)');
+    console.log('📖 MANGAFLOW - WEB DOC TRUYEN (TRUYENQQ / NETTRUYEN)');
     console.log('===========================================================');
     console.log('');
     console.log('  👉 May tinh truy cap: http://localhost:' + port);
