@@ -208,6 +208,7 @@ const el = {
 
   // Bookmarks & History
   selectBookmarkSort: document.getElementById('select-bookmark-sort'),
+  btnSyncBookmarks: document.getElementById('btn-sync-bookmarks'),
   bookmarksGrid: document.getElementById('bookmarks-grid'),
   bookmarksCountPill: document.getElementById('bookmarks-count-pill'),
   btnExportBackup: document.getElementById('btn-export-backup'),
@@ -1301,8 +1302,9 @@ function getBookmarkSortTime(comic) {
   }
   if (comic.chapters && comic.chapters.length > 0) {
     const ch = comic.chapters[0];
-    if (ch.time) {
-      const parsed = parseVietnameseTime(ch.time);
+    const timeVal = ch.time || ch.updatedAt;
+    if (timeVal) {
+      const parsed = parseVietnameseTime(timeVal);
       if (parsed > 0) return parsed;
     }
   }
@@ -1311,6 +1313,82 @@ function getBookmarkSortTime(comic) {
     if (!isNaN(t) && t > 0) return t;
   }
   return 0;
+}
+
+
+let isSyncingBookmarks = false;
+async function syncBookmarksUpdates(force = false) {
+  if (isSyncingBookmarks || !state.bookmarks || state.bookmarks.length === 0) return;
+  
+  const lastSync = parseInt(sessionStorage.getItem('mf_last_bookmarks_sync') || '0', 10);
+  const now = Date.now();
+  if (!force && (now - lastSync < 180000)) {
+    return;
+  }
+  sessionStorage.setItem('mf_last_bookmarks_sync', String(now));
+  isSyncingBookmarks = true;
+
+  if (el.btnSyncBookmarks) {
+    el.btnSyncBookmarks.disabled = true;
+    el.btnSyncBookmarks.innerHTML = '🔄 Đang cập nhật...';
+  }
+
+  try {
+    let hasChange = false;
+    const targets = state.bookmarks.slice(0, 40);
+    
+    for (let i = 0; i < targets.length; i += 5) {
+      const batch = targets.slice(i, i + 5);
+      await Promise.all(batch.map(async (bm) => {
+        try {
+          const detail = await fetchCached(`${API_BASE}/detail?slug=${encodeURIComponent(bm.slug)}`, 180000);
+          if (detail && detail.chapters && detail.chapters.length > 0) {
+            const latest = detail.chapters[0];
+            const latestTitle = latest.name || latest.title || '';
+            const latestTime = latest.time || '';
+            const parsedTime = parseVietnameseTime(latestTime);
+
+            const currentTitle = bm.chapters?.[0]?.title || bm.chapters?.[0]?.name || '';
+            if (latestTitle && currentTitle !== latestTitle) {
+              bm.chapters = [{
+                title: latestTitle,
+                chapterSlug: latest.chapterSlug,
+                url: latest.url,
+                time: latestTime
+              }];
+              bm.updatedAt = parsedTime > 0 ? parsedTime : Date.now();
+              hasChange = true;
+            } else if (parsedTime > 0 && (!bm.updatedAt || bm.updatedAt !== parsedTime)) {
+              bm.updatedAt = parsedTime;
+              if (bm.chapters && bm.chapters[0]) bm.chapters[0].time = latestTime;
+              hasChange = true;
+            }
+          }
+        } catch (e) {}
+      }));
+    }
+
+    if (hasChange) {
+      localStorage.setItem('mf_bookmarks', JSON.stringify(state.bookmarks));
+      const sortType = state.bookmarkSort || 'updated';
+      const sorted = [...state.bookmarks];
+      if (sortType === 'updated') {
+        sorted.sort((a, b) => getBookmarkSortTime(b) - getBookmarkSortTime(a));
+      }
+      renderComicsGrid(sorted, el.bookmarksGrid);
+      showToast('✨ Đã cập nhật ngày ra chap mới nhất cho truyện theo dõi!');
+    } else if (force) {
+      showToast('✅ Danh sách theo dõi đã ở trạng thái mới nhất!');
+    }
+  } catch (err) {
+    console.error('Error syncing bookmarks:', err);
+  } finally {
+    isSyncingBookmarks = false;
+    if (el.btnSyncBookmarks) {
+      el.btnSyncBookmarks.disabled = false;
+      el.btnSyncBookmarks.innerHTML = '🔄 Cập nhật chap';
+    }
+  }
 }
 
 // Bookmarks & History functions
@@ -1367,21 +1445,23 @@ function renderBookmarks() {
   if (sortType === 'az') {
     sorted.sort((a, b) => (a.title || '').localeCompare(b.title || '', 'vi'));
   } else if (sortType === 'added') {
-    // Thứ tự thêm gần nhất
+    // Giữ nguyên thứ tự thêm vào
   } else {
     // 'updated' (Mặc định: Ngày cập nhật mới nhất lên đầu)
     sorted.sort((a, b) => {
       const timeA = getBookmarkSortTime(a);
       const timeB = getBookmarkSortTime(b);
       if (timeB !== timeA) return timeB - timeA;
-      const numA = parseChapterNum(a.chapters?.[0]?.title);
-      const numB = parseChapterNum(b.chapters?.[0]?.title);
-      if (numB !== numA) return numB - numA;
       return 0;
     });
   }
 
   renderComicsGrid(sorted, el.bookmarksGrid);
+
+  // Tự động kiểm tra chap mới ngầm
+  if (state.bookmarks.length > 0) {
+    setTimeout(() => syncBookmarksUpdates(false), 800);
+  }
 }
 
 function renderHistory() {
@@ -1467,6 +1547,7 @@ el.inputImportBackup.onchange = (e) => {
       updateBookmarkBadge();
       renderBookmarks();
       showToast('📥 Phục hồi dữ liệu thành công!');
+      setTimeout(() => syncBookmarksUpdates(true), 300);
     } catch (err) {
       showToast('Lỗi đọc file backup JSON!');
     }
@@ -1896,6 +1977,7 @@ if (el.selectBookmarkSort) {
   };
 }
 
+if (el.btnSyncBookmarks) el.btnSyncBookmarks.onclick = () => syncBookmarksUpdates(true);
 // Initialize
 updateBookmarkBadge();
 setupGenresModal();

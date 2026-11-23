@@ -334,23 +334,46 @@ function parseQQDetail(html, slug) {
   }
 
   const chapters = [];
-  const chapMatches = [...html.matchAll(/<a[^>]*href="([^"]*[-_\/]chap(?:ter)?[-_][^"\/]+)"[^>]*>([\s\S]*?)<\/a>/gi)];
   const seenChaps = new Set();
-  for (const cm of chapMatches) {
-    const cUrl = cm[1].trim();
-    const chapName = decodeHtml(cm[2].replace(/<[^>]+>/g, ''));
-    if (chapName.includes('Đọc từ') || chapName.includes('Đọc tiếp')) continue;
 
+  // Pattern 1: TruyenQQ modern works-chapter-item with date
+  const worksMatches = [...html.matchAll(/<div class="works-chapter-item">[\s\S]*?<a[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?<div class="[^"]*time-chap[^"]*">([\s\S]*?)<\/div>/gi)];
+  for (const wm of worksMatches) {
+    const cUrl = wm[1].trim();
+    const chapName = decodeHtml(wm[2].replace(/<[^>]+>/g, '').trim());
+    const timeChap = decodeHtml(wm[3].replace(/<[^>]+>/g, '').trim());
     const cSlug = cUrl.split('/').filter(Boolean).pop();
-    if (!seenChaps.has(cSlug)) {
+    if (cSlug && !seenChaps.has(cSlug)) {
       seenChaps.add(cSlug);
       chapters.push({
         id: 0,
         name: chapName,
         chapterSlug: cSlug,
-        time: '',
+        time: timeChap,
         url: `${TRUYENQQ_PRIMARY}${cUrl.startsWith('/') ? cUrl : '/' + cUrl}`
       });
+    }
+  }
+
+  // Pattern 2: Fallback general regex
+  if (chapters.length === 0) {
+    const chapMatches = [...html.matchAll(/<a[^>]*href="([^"]*[-_\/]chap(?:ter)?[-_][^"\/]+)"[^>]*>([\s\S]*?)<\/a>/gi)];
+    for (const cm of chapMatches) {
+      const cUrl = cm[1].trim();
+      const chapName = decodeHtml(cm[2].replace(/<[^>]+>/g, ''));
+      if (chapName.includes('Đọc từ') || chapName.includes('Đọc tiếp')) continue;
+
+      const cSlug = cUrl.split('/').filter(Boolean).pop();
+      if (!seenChaps.has(cSlug)) {
+        seenChaps.add(cSlug);
+        chapters.push({
+          id: 0,
+          name: chapName,
+          chapterSlug: cSlug,
+          time: '',
+          url: `${TRUYENQQ_PRIMARY}${cUrl.startsWith('/') ? cUrl : '/' + cUrl}`
+        });
+      }
     }
   }
 
