@@ -63,7 +63,8 @@ const state = {
   // Bookmarks & History (LocalStorage)
   bookmarks: JSON.parse(localStorage.getItem('mf_bookmarks') || '[]'),
   history: JSON.parse(localStorage.getItem('mf_history') || '[]'),
-  readChapters: JSON.parse(localStorage.getItem('mf_read_chapters') || '{}')
+  readChapters: JSON.parse(localStorage.getItem('mf_read_chapters') || '{}'),
+  bookmarkSort: localStorage.getItem('mf_bookmark_sort') || 'updated'
 };
 
 // Verified Clean Categories from NetTruyen Engine
@@ -206,6 +207,7 @@ const el = {
   readProgressBar: document.getElementById('read-progress-bar'),
 
   // Bookmarks & History
+  selectBookmarkSort: document.getElementById('select-bookmark-sort'),
   bookmarksGrid: document.getElementById('bookmarks-grid'),
   bookmarksCountPill: document.getElementById('bookmarks-count-pill'),
   btnExportBackup: document.getElementById('btn-export-backup'),
@@ -1244,6 +1246,73 @@ el.btnRandomManga.onclick = () => {
   }
 };
 
+
+function parseVietnameseTime(timeStr) {
+  if (!timeStr) return 0;
+  const s = String(timeStr).toLowerCase().trim();
+  const now = Date.now();
+  
+  if (s.includes('vừa') || s.includes('mới')) return now;
+  
+  let m = s.match(/(\d+)\s*giây/);
+  if (m) return now - parseInt(m[1], 10) * 1000;
+  
+  m = s.match(/(\d+)\s*phút/);
+  if (m) return now - parseInt(m[1], 10) * 60 * 1000;
+  
+  m = s.match(/(\d+)\s*(?:giờ|tiếng)/);
+  if (m) return now - parseInt(m[1], 10) * 3600 * 1000;
+  
+  if (s.includes('hôm qua')) return now - 24 * 3600 * 1000;
+  if (s.includes('hôm kia')) return now - 48 * 3600 * 1000;
+
+  m = s.match(/(\d+)\s*ngày/);
+  if (m) return now - parseInt(m[1], 10) * 24 * 3600 * 1000;
+  
+  m = s.match(/(\d+)\s*tuần/);
+  if (m) return now - parseInt(m[1], 10) * 7 * 24 * 3600 * 1000;
+  
+  m = s.match(/(\d+)\s*tháng/);
+  if (m) return now - parseInt(m[1], 10) * 30 * 24 * 3600 * 1000;
+  
+  m = s.match(/(\d+)\s*năm/);
+  if (m) return now - parseInt(m[1], 10) * 365 * 24 * 3600 * 1000;
+  
+  m = s.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+  if (m) {
+    const d = new Date(parseInt(m[3], 10), parseInt(m[2], 10) - 1, parseInt(m[1], 10));
+    return d.getTime() || 0;
+  }
+  
+  const parsed = Date.parse(timeStr);
+  return isNaN(parsed) ? 0 : parsed;
+}
+
+function parseChapterNum(title) {
+  if (!title) return 0;
+  const m = String(title).match(/(?:chap|chương|chapter)\s*([0-9]+(?:\.[0-9]+)?)/i);
+  return m ? parseFloat(m[1]) : 0;
+}
+
+function getBookmarkSortTime(comic) {
+  if (comic.updatedAt) {
+    const t = typeof comic.updatedAt === 'number' ? comic.updatedAt : Date.parse(comic.updatedAt);
+    if (!isNaN(t) && t > 0) return t;
+  }
+  if (comic.chapters && comic.chapters.length > 0) {
+    const ch = comic.chapters[0];
+    if (ch.time) {
+      const parsed = parseVietnameseTime(ch.time);
+      if (parsed > 0) return parsed;
+    }
+  }
+  if (comic.bookmarkedAt) {
+    const t = typeof comic.bookmarkedAt === 'number' ? comic.bookmarkedAt : Date.parse(comic.bookmarkedAt);
+    if (!isNaN(t) && t > 0) return t;
+  }
+  return 0;
+}
+
 // Bookmarks & History functions
 function markChapterAsRead(comicSlug, chapterSlug) {
   if (!state.readChapters[comicSlug]) {
@@ -1268,12 +1337,15 @@ function toggleFavorite(comic) {
     state.bookmarks.splice(index, 1);
     showToast(`Đã bỏ theo dõi "${comic.title}"`);
   } else {
+    const chapTime = comic.chapters?.[0]?.time ? parseVietnameseTime(comic.chapters[0].time) : 0;
     state.bookmarks.unshift({
       slug: comic.slug,
       title: comic.title,
       cover: comic.cover,
       views: comic.views,
-      chapters: comic.chapters
+      chapters: comic.chapters,
+      bookmarkedAt: Date.now(),
+      updatedAt: chapTime > 0 ? chapTime : Date.now()
     });
     showToast(`❤️ Đã theo dõi "${comic.title}"`);
   }
@@ -1285,7 +1357,31 @@ function toggleFavorite(comic) {
 function renderBookmarks() {
   switchView('bookmarks');
   el.bookmarksCountPill.textContent = `${state.bookmarks.length} bộ truyện`;
-  renderComicsGrid(state.bookmarks, el.bookmarksGrid);
+
+  const sortType = state.bookmarkSort || 'updated';
+  if (el.selectBookmarkSort) {
+    el.selectBookmarkSort.value = sortType;
+  }
+
+  const sorted = [...state.bookmarks];
+  if (sortType === 'az') {
+    sorted.sort((a, b) => (a.title || '').localeCompare(b.title || '', 'vi'));
+  } else if (sortType === 'added') {
+    // Thứ tự thêm gần nhất
+  } else {
+    // 'updated' (Mặc định: Ngày cập nhật mới nhất lên đầu)
+    sorted.sort((a, b) => {
+      const timeA = getBookmarkSortTime(a);
+      const timeB = getBookmarkSortTime(b);
+      if (timeB !== timeA) return timeB - timeA;
+      const numA = parseChapterNum(a.chapters?.[0]?.title);
+      const numB = parseChapterNum(b.chapters?.[0]?.title);
+      if (numB !== numA) return numB - numA;
+      return 0;
+    });
+  }
+
+  renderComicsGrid(sorted, el.bookmarksGrid);
 }
 
 function renderHistory() {
@@ -1347,7 +1443,20 @@ el.inputImportBackup.onchange = (e) => {
   reader.onload = (event) => {
     try {
       const data = JSON.parse(event.target.result);
-      if (data.bookmarks) state.bookmarks = data.bookmarks;
+      if (data.bookmarks) {
+        const baseTime = Date.now();
+        data.bookmarks.forEach((b, idx) => {
+          if (!b.updatedAt) {
+            if (b.chapters && b.chapters[0] && b.chapters[0].time) {
+              b.updatedAt = parseVietnameseTime(b.chapters[0].time);
+            }
+            if (!b.updatedAt) {
+              b.updatedAt = baseTime - idx * 60000;
+            }
+          }
+        });
+        state.bookmarks = data.bookmarks;
+      }
       if (data.history) state.history = data.history;
       if (data.readChapters) state.readChapters = data.readChapters;
 
@@ -1776,6 +1885,15 @@ function _loadHomeView(searchParamsStr = '') {
 
   switchView('home');
   loadHome(page, sort, '', status);
+}
+
+
+if (el.selectBookmarkSort) {
+  el.selectBookmarkSort.onchange = (e) => {
+    state.bookmarkSort = e.target.value;
+    localStorage.setItem('mf_bookmark_sort', state.bookmarkSort);
+    renderBookmarks();
+  };
 }
 
 // Initialize

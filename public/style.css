@@ -2652,3 +2652,34 @@ html.ios-dynamic-island.standalone-ios .read-progress {
     height: 54px !important;
   }
 }
+
+
+/* Compact Sort Selector for Bookmarks */
+.select-sort-compact {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-main);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 7px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.select-sort-compact:hover,
+.select-sort-compact:focus {
+  border-color: var(--accent-primary);
+  background: var(--bg-card-hover);
+}
+
+@media (max-width: 768px) {
+  .actions-group .select-sort-compact {
+    flex: 1 1 100% !important;
+    padding: 9px 12px !important;
+    font-size: 13px !important;
+    border-radius: 10px !important;
+  }
+}

@@ -19,7 +19,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=2.2">
+  <link rel="stylesheet" href="style.css?v=2.3">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⛩️</text></svg>">
 </head>
 <body class="theme-dark filter-normal">
@@ -473,6 +473,11 @@
           <span class="count-pill" id="bookmarks-count-pill">0 bộ truyện</span>
         </div>
         <div class="actions-group">
+          <select id="select-bookmark-sort" class="select-sort-compact" title="Sắp xếp danh sách theo dõi">
+            <option value="updated">🕒 Mới cập nhật</option>
+            <option value="added">📅 Mới theo dõi</option>
+            <option value="az">🔤 Tên A-Z</option>
+          </select>
           <button class="btn btn-secondary btn-sm" id="btn-export-backup" title="Sao lưu dữ liệu ra file">💾 Export Backup</button>
           <label class="btn btn-secondary btn-sm" style="cursor: pointer;" title="Phục hồi dữ liệu từ file">
             📥 Import <input type="file" id="input-import-backup" accept=".json" style="display: none;">
@@ -566,6 +571,6 @@
     <span id="spinner-text">Đang tải dữ liệu...</span>
   </div>
 
-  <script src="script.js?v=2.2"></script>
+  <script src="script.js?v=2.3"></script>
 </body>
 </html>

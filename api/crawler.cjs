@@ -215,6 +215,8 @@ function parseQQComics(html) {
     const title = decodeHtml(m[4].replace(/<[^>]+>/g, '').trim());
     const chapUrl = m[5] ? m[5].trim() : '';
     const chapName = m[6] ? decodeHtml(m[6].replace(/<[^>]+>/g, '').trim()) : '';
+    const timeMatch = m[0].match(/class="time-ago">([\s\S]*?)<\/span>/i);
+    const time = timeMatch ? decodeHtml(timeMatch[1].replace(/<[^>]+>/g, '').trim()) : '';
     const slug = rawUrl.replace(/^\/truyen-tranh\//, '').replace(/^\/+|\/+$/g, '');
     if (!slug || seen.has(slug)) continue;
     seen.add(slug);
@@ -229,7 +231,7 @@ function parseQQComics(html) {
         title: chapName,
         chapterSlug: chapUrl.split('/').filter(Boolean).pop(),
         url: chapUrl.startsWith('http') ? chapUrl : `${TRUYENQQ_PRIMARY}${chapUrl.startsWith('/') ? '' : '/'}${chapUrl}`,
-        time: ''
+        time: time
       }] : []
     });
   }
