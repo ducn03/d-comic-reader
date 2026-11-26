@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 400" width="300" height="400">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#111827"/>
+      <stop offset="100%" stop-color="#090d16"/>
+    </linearGradient>
+  </defs>
+  <rect width="300" height="400" fill="url(#bg)"/>
+  <rect x="16" y="16" width="268" height="368" rx="14" fill="none" stroke="#1e293b" stroke-width="2" stroke-dasharray="6 6"/>
+  <text x="150" y="185" text-anchor="middle" font-size="48" fill="#ff2a55">⛩️</text>
+  <text x="150" y="230" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="700" fill="#94a3b8">MangaFlow</text>
+  <text x="150" y="254" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="12" fill="#475569">Không có ảnh bìa</text>
+</svg>

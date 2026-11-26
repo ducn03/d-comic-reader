@@ -1,92 +1,66 @@
-# ⛩️ D-Comic-Reader (MangaFlow PRO)
+# ⛩️ D-Comic-Reader (MangaFlow)
 
-> High-End Dark Manga & Anime Web Reader crawled live in real-time from Hinettruyen.com.  
-> Ứng dụng đọc truyện tranh trực tuyến hiện đại, mượt mà, tối ưu hóa toàn diện cho cả Laptop/PC và Điện thoại.
-
----
-
-## ✨ Tính Năng Nổi Bật (Features)
-
-- **⚡ Live Crawl 100% Real-time**: Tự động đồng bộ truyện mới nhất, hot nhất, tìm kiếm và danh sách hàng ngàn chương từ Hinettruyen mà không cần database lưu trữ thủ công.
-- **🛡️ Bypass Image Proxy**: Giải quyết triệt để lỗi chặn ảnh 403 Forbidden / Hotlink protection bằng hệ thống proxy stream hình ảnh thông minh.
-- **📱 Responsive & Tối Ưu Mobile/Desktop**:
-  - Giao diện Dark Cyberpunk / Neon Manga sang trọng, sắc nét.
-  - Tự động ẩn Header khi đọc truyện để toàn màn hình 100%.
-  - Nút công cụ góc phải dạng **Speed Dial FAB** (bấm vào xổ ra / thu gọn icon tròn tối giản).
-  - Thanh chuyển chương thông minh tự ẩn khi ở chương đầu/cuối và không bị che khuất.
-  - Trạng thái tải chương truyện (Loading spinner) được căn giữa màn hình chuẩn xác.
-- **🗂️ 42 Thể Loại Chuẩn**: Hỗ trợ đầy đủ các thể loại hot: Action, Manhwa, Manhua, Manga, Tu Tiên, Chuyển Sinh, Xuyên Không, Cổ Đại, Ngôn Tình, Hài Hước, Trinh Thám,...
-- **🎲 Gacha Truyện Ngẫu Nhiên (Random)**: Giúp độc giả chọn nhanh một bộ truyện ngẫu nhiên khi chưa biết đọc gì.
-- **❤️ Yêu Thích & Lịch Sử Đọc (Bookmarks & History)**: Tự động lưu truyện và chương đang đọc vào LocalStorage, hỗ trợ Export sao lưu và Import dữ liệu.
-- **📜 Đa Chế Độ Đọc**:
-  - Cuộn dọc liên tục (Webtoon Continuous Scroll).
-  - Lật từng trang (Paged Mode).
-  - Tự động cuộn trang (Auto-scroll rảnh tay với phím Space).
-  - Toàn màn hình (Fullscreen với phím F).
+Ứng dụng đọc truyện tranh online hiện đại, mượt mà, tối ưu hóa cho cả Desktop và Mobile (PWA), lấy dữ liệu trực tiếp từ **TruyenQQ** (có dự phòng **NetTruyen**).
 
 ---
 
-## 🚀 Hướng Dẫn Deploy (Deployment Guide)
+## ✨ Tính Năng Nổi Bật
 
-### 1. Deploy lên Vercel (Khuyên dùng - Nhanh & Miễn Phí 100%)
-Dự án đã được cấu hình sẵn tệp `vercel.json` và Serverless Function `api/manga.js`.
-
-1. Đẩy mã nguồn lên GitHub:
-   ```bash
-   git add .
-   git commit -m "feat: complete manga reader web application"
-   git push origin main
-   ```
-2. Truy cập [vercel.com](https://vercel.com) và đăng nhập bằng tài khoản GitHub.
-3. Bấm **"Add New"** -> **"Project"** -> Chọn repository `d-comic-reader`.
-4. Nhấn **"Deploy"** (không cần cấu hình thêm gì cả, Vercel sẽ tự động nhận diện và build).
-5. Sau 1 phút, bạn sẽ có đường link trực tiếp (ví dụ: `https://d-comic-reader.vercel.app`) để truy cập trên mọi thiết bị!
+- **⚡ Crawler & Proxy Tốc Độ Cao**:
+  - Parse HTML bằng **Cheerio**, sử dụng HTTP/HTTPS **Keep-Alive Pool**, nén `gzip`/`brotli`, LRU cache kèm **Request Coalescing** (chống trùng lặp request).
+  - Image Proxy stream bất đồng bộ an toàn trên cả Local Node.js và Vercel Serverless, bảo vệ chống SSRF và hỗ trợ `ETag` / `304`.
+- **📜 Trình Đọc Mượt 60fps & Dễ Dùng**:
+  - **Tap-to-Toggle HUD**: chạm giữa màn hình để ẩn/hiện thanh công cụ trên & dưới vùng ngón cái.
+  - **2 Chế Độ Đọc**: Cuộn dọc liên tục (**Webtoon** với preloader giới hạn luồng qua `IntersectionObserver`) và Lật trang (**Paged** hỗ trợ Trái→Phải, Phải→Trái cho Manga, vuốt ngang & chạm 3 vùng).
+  - **Tự Động Lưu & Khôi Phục Vị Trí Đọc**: mở lại chương cũ nhảy đúng tới trang đang đọc dở.
+  - **Cài Đặt Cá Nhân Hóa**: Đổi độ rộng khung ảnh, khoảng cách trang, chủ đề (`Dark` / `OLED` / `Sepia`), độ sáng màn đọc, tốc độ tự động cuộn (`deltaTime` ổn định mọi tần số quét).
+  - **Danh Sách Chương Phân Nhóm (Chunked)**: mở truyện 1.000+ chương không giật lag.
+- **❤️ Theo Dõi, Lịch Sử & Backup**:
+  - Huy hiệu **MỚI** cho truyện có chap chưa đọc, hoàn tác khi bỏ thích, lọc nhanh, kiểm tra chap mới nhẹ nhàng, Export/Import JSON backup.
 
 ---
 
-### 2. Deploy lên Render.com hoặc Railway
-Dự án sử dụng Node.js thuần (không cần dependencies nặng):
-- **Build Command**: Để trống (hoặc `npm install` nếu cần).
-- **Start Command**: `npm start` (chạy `node server.js`).
-- Port: Tự động nhận diện qua biến môi trường `process.env.PORT`.
+## 🚀 Chạy Cục Bộ & Deploy
 
----
+### 1. Chạy trên Windows (Nhanh nhất)
+Nhấp đúp vào file `Mo Web Doc Truyen.bat` (tự cài dependencies nếu thiếu và mở trình duyệt tại `http://localhost:3000`).
 
-### 3. Chạy Cục Bộ Trên Máy Tính (Local Run)
-
-#### Cách 1: Chạy bằng file .bat (Nhanh nhất trên Windows)
-- Nhấp đúp vào file `Mo Web Doc Truyen.bat`.
-- Server sẽ tự động khởi động và trình duyệt sẽ tự mở trang web tại `http://localhost:3000`.
-
-#### Cách 2: Chạy bằng lệnh Node.js
+### 2. Chạy bằng lệnh Node.js
 ```bash
-# Khởi động server
-node server.js
+npm install
+npm start
 ```
-- Truy cập từ máy tính: `http://localhost:3000`
-- Truy cập từ điện thoại (cùng mạng Wi-Fi): `http://[IP_CUA_BAN]:3000`
+- Máy tính: `http://localhost:3000`
+- Điện thoại (cùng Wi-Fi): `http://[IP_CUA_BAN]:3000`
+
+### 3. Deploy lên Vercel
+Dự án tự động phục vụ giao diện tĩnh từ thư mục `public/` và Serverless Function tại `api/manga.js` (dùng chung core `lib/` với `server.cjs`).
 
 ---
 
-## 🛠️ Cấu Trúc Mã Nguồn (Project Structure)
+## 🛠️ Cấu Trúc Mã Nguồn
 
-```
+```text
 d-comic-reader/
 ├── api/
-│   └── manga.js             # Vercel Serverless Function API Handler
-├── crawler.cjs              # Engine cào dữ liệu từ Hinettruyen & stream ảnh
-├── server.js                # Server Node.js cục bộ & cloud platforms (Render/Railway)
-├── index.html               # Giao diện chính MangaFlow PRO
-├── style.css                # Toàn bộ stylesheet giao diện Dark Mode & Mobile
-├── app.js                   # Logic ứng dụng, router, render, speed-dial FAB
-├── package.json             # Cấu hình dự án & scripts khởi chạy
-├── vercel.json              # Cấu hình định tuyến Serverless Vercel
-├── .gitignore               # Tệp loại trừ khi đẩy lên Git
-├── Mo Web Doc Truyen.bat    # Phím tắt nhấp đúp khởi động web trên Windows
-└── README.md                # Tài liệu hướng dẫn sử dụng và triển khai
+│   └── manga.js                 # Vercel Serverless Function entry
+├── lib/
+│   ├── api-handler.cjs          # Router API dùng chung (Local & Vercel)
+│   ├── cache.cjs                # LRU TTL Cache + Request Coalescing
+│   ├── http-client.cjs          # Keep-Alive Pool + Gzip/Br + Redirect + SSRF Guard
+│   ├── image-proxy.cjs          # Async Image Proxy + ETag + Size/MIME Guard
+│   └── sources/
+│       ├── genres.cjs           # Danh mục 46 thể loại chuẩn
+│       ├── index.cjs            # Source Orchestrator + Fallback
+│       ├── truyenqq.cjs         # Adapter TruyenQQ (Cheerio)
+│       └── nettruyen.cjs        # Adapter NetTruyen fallback (Cheerio + Mirror Race)
+├── public/
+│   ├── index.html
+│   ├── manifest.json
+│   ├── assets/cover-fallback.svg
+│   ├── css/                     # tokens.css, base.css, views.css, reader.css
+│   └── js/                      # main.js, state.js, api.js, router.js, utils.js, views/
+├── server.cjs                   # Local HTTP Server (Gzip/Brotli + ETag + Static)
+├── Mo Web Doc Truyen.bat
+└── package.json
 ```
-
----
-
-## 📜 Bản Quyền & Giấy Phép
-Dự án được xây dựng phục vụ mục đích học tập và giải trí cá nhân. Dữ liệu truyện tranh và hình ảnh thuộc về các tác giả và trang nguồn Hinettruyen.com.

@@ -4,13 +4,20 @@ color 0A
 chcp 65001 >nul
 
 echo ========================================================
-echo   📖 KHỞI ĐỘNG MANGAFLOW - WEB ĐỌC TRUYỆN TRANH
+echo   MANGAFLOW - WEB DOC TRUYEN TRANH
 echo ========================================================
 echo.
-echo Đang khởi động Server cào dữ liệu từ Hinettruyen...
+
+if not exist "node_modules" (
+  echo Dang cai dat thu vien can thiet...
+  call npm install
+  echo.
+)
+
+echo Dang khoi dong Server MangaFlow...
 echo.
 
 start "" "http://localhost:3000"
-node server.js
+node server.cjs
 
 pause

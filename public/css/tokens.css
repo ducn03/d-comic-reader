@@ -1,0 +1,63 @@
+/* ========================================================
+   Design Tokens & Theme Presets (Dark / OLED / Sepia)
+   ======================================================== */
+
+:root {
+  --bg-primary: #080b12;
+  --bg-secondary: #0f1523;
+  --bg-card: #151d2f;
+  --bg-card-hover: #192338;
+  --bg-surface-solid: rgba(11, 16, 28, 0.97);
+
+  --accent-primary: #ff2a55;
+  --accent-secondary: #ff5277;
+  --accent-gold: #f59e0b;
+  --accent-cyan: #06b6d4;
+  --accent-green: #10b981;
+
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --text-dim: #64748b;
+
+  --border-subtle: rgba(255, 255, 255, 0.09);
+  --border-card: rgba(255, 255, 255, 0.06);
+
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-full: 9999px;
+
+  --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 12px 32px rgba(0, 0, 0, 0.55);
+
+  --header-height: 62px;
+  --bottom-nav-height: 62px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+
+  /* Dynamic Reader Settings */
+  --reader-max-width: 840px;
+  --reader-gap: 0px;
+}
+
+body.theme-oled {
+  --bg-primary: #000000;
+  --bg-secondary: #070709;
+  --bg-card: #0e1016;
+  --bg-card-hover: #151822;
+  --bg-surface-solid: rgba(0, 0, 0, 0.97);
+}
+
+body.theme-sepia {
+  --bg-primary: #1a1510;
+  --bg-secondary: #241d17;
+  --bg-card: #2c241d;
+  --bg-card-hover: #352c23;
+  --bg-surface-solid: rgba(26, 21, 16, 0.97);
+}
+
+body.theme-sepia .reader-page-img,
+body.theme-sepia .paged-current-img {
+  filter: sepia(26%) contrast(96%) brightness(94%);
+}

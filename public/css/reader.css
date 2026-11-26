@@ -1,0 +1,559 @@
+/* ========================================================
+   Reader View: Zero-Reflow Progress, Tap-to-Toggle HUD,
+   Webtoon Preloader Canvas, Paged Swipe Reader & Settings Sheet
+   ======================================================== */
+
+/* GPU-only reading progress bar (no width reflow!) */
+.read-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background: linear-gradient(90deg, var(--accent-gold), var(--accent-primary), var(--accent-cyan));
+  transform: scaleX(0);
+  transform-origin: left center;
+  will-change: transform;
+  z-index: 1050;
+  pointer-events: none;
+}
+
+/* ==================== Top & Bottom Tap-to-Toggle HUD ==================== */
+.reader-top-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: calc(54px + var(--safe-top));
+  padding: var(--safe-top) 14px 0 14px;
+  background: var(--bg-surface-solid);
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  z-index: 980;
+  transition: transform 0.22s ease, opacity 0.22s ease;
+}
+
+.reader-top-bar.hud-hidden {
+  transform: translateY(-105%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.reader-toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.reader-title-group {
+  min-width: 0;
+  flex: 1;
+}
+
+.reader-comic-title {
+  font-size: 13.5px;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #fff;
+}
+
+.reader-chapter-title {
+  font-size: 11.5px;
+  color: var(--accent-gold);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.reader-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.reader-bottom-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 10px 14px calc(10px + var(--safe-bottom)) 14px;
+  background: var(--bg-surface-solid);
+  border-top: 1px solid var(--border-subtle);
+  z-index: 980;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: transform 0.22s ease, opacity 0.22s ease;
+}
+
+.reader-bottom-bar.hud-hidden {
+  transform: translateY(105%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.reader-hud-scrubber-row {
+  max-width: 720px;
+  width: 100%;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.reader-page-counter {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  white-space: nowrap;
+  min-width: 72px;
+}
+
+.reader-hud-scrubber {
+  flex: 1;
+  accent-color: var(--accent-primary);
+  cursor: pointer;
+}
+
+.reader-hud-actions-row {
+  max-width: 720px;
+  width: 100%;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.btn-hud {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-main);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-hud:hover:not(:disabled) {
+  border-color: var(--accent-primary);
+  background: var(--bg-card-hover);
+}
+
+.btn-hud.active {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: #fff;
+}
+
+.btn-hud:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* ==================== Brightness Dimmer ==================== */
+.reader-dimmer {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 970;
+}
+
+/* ==================== Reader Canvas & Webtoon ==================== */
+.reader-canvas {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: calc(58px + var(--safe-top)) 0 24px 0;
+  min-height: 90vh;
+}
+
+.reader-loading {
+  min-height: 68vh;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.reader-images-container {
+  width: 100%;
+  max-width: var(--reader-max-width);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--reader-gap);
+}
+
+.reader-page-wrapper {
+  position: relative;
+  width: 100%;
+  background: #06080e;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 900px;
+}
+
+.reader-page-wrapper.is-loading {
+  aspect-ratio: 2 / 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.reader-page-wrapper.is-loading::before {
+  content: attr(data-page-label);
+  color: var(--text-dim);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.reader-page-img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.reader-page-error {
+  padding: 32px 16px;
+  text-align: center;
+  background: rgba(255, 42, 85, 0.08);
+  border: 1px dashed rgba(255, 42, 85, 0.35);
+  border-radius: 10px;
+  margin: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.page-num-badge {
+  position: absolute;
+  bottom: 8px;
+  right: 10px;
+  background: rgba(0, 0, 0, 0.72);
+  color: #cbd5e1;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
+  pointer-events: none;
+}
+
+/* ==================== Paged Mode ==================== */
+.paged-reader-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: calc(100vh - 130px);
+  padding: 8px;
+}
+
+.paged-img-viewport {
+  position: relative;
+  width: 100%;
+  max-width: var(--reader-max-width);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 75vh;
+  touch-action: pan-y pinch-zoom;
+}
+
+.paged-current-img {
+  max-width: 100%;
+  max-height: calc(100vh - 96px);
+  object-fit: contain;
+  display: block;
+  user-select: none;
+}
+
+.paged-tap-zone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 5;
+  cursor: pointer;
+}
+
+.paged-tap-zone.left {
+  left: 0;
+  width: 30%;
+}
+.paged-tap-zone.center {
+  left: 30%;
+  width: 40%;
+}
+.paged-tap-zone.right {
+  right: 0;
+  width: 30%;
+}
+
+.paged-nav-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #fff;
+  font-size: 28px;
+  width: 42px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 8px;
+  z-index: 10;
+  opacity: 0.7;
+  transition: opacity 0.15s, background-color 0.15s;
+}
+
+.paged-nav-btn:hover {
+  opacity: 1;
+  background: var(--accent-primary);
+}
+.paged-nav-btn.prev {
+  left: 10px;
+}
+.paged-nav-btn.next {
+  right: 10px;
+}
+
+/* ==================== End-of-Chapter Footer Nav ==================== */
+.reader-end-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px 16px 110px 16px;
+  max-width: 600px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.btn-nav-bottom {
+  flex: 1;
+  padding: 12px 18px;
+  font-size: 14px;
+  border-radius: var(--radius-md);
+}
+
+/* ==================== Reader Settings Sheet ==================== */
+.settings-sheet-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  z-index: 1120;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.settings-sheet {
+  width: 100%;
+  max-width: 520px;
+  background: var(--bg-card);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  padding: 18px 20px calc(20px + var(--safe-bottom)) 20px;
+  max-height: 82vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow-md);
+}
+
+.settings-sheet-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.settings-sheet-header h3 {
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.settings-group {
+  margin-bottom: 14px;
+}
+
+.settings-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+
+.segmented-group {
+  display: flex;
+  gap: 6px;
+}
+
+.seg-btn {
+  flex: 1;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 8px 6px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.seg-btn.active {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: #fff;
+}
+
+.settings-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.settings-slider-row input[type='range'] {
+  flex: 1;
+  accent-color: var(--accent-primary);
+}
+
+/* ==================== Chapter Slide-out Drawer ==================== */
+.chapter-drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 1130;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.chapter-drawer {
+  width: min(340px, 88vw);
+  height: 100%;
+  background: var(--bg-card);
+  border-left: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  padding: calc(16px + var(--safe-top)) 16px calc(16px + var(--safe-bottom)) 16px;
+}
+
+.drawer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.drawer-search input {
+  width: 100%;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  color: var(--text-main);
+  outline: none;
+  font-family: inherit;
+  margin-bottom: 10px;
+}
+
+.drawer-chunks-bar {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+
+.drawer-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.drawer-item {
+  padding: 10px 12px;
+  background: var(--bg-secondary);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text-main);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.drawer-item:hover {
+  border-color: var(--accent-primary);
+}
+
+.drawer-item.active {
+  background: var(--accent-primary);
+  color: #fff;
+}
+
+.drawer-item.is-read:not(.active) {
+  opacity: 0.55;
+}
+
+@media (min-width: 769px) {
+  .settings-sheet-overlay {
+    align-items: center;
+  }
+
+  .settings-sheet {
+    border-radius: var(--radius-lg);
+  }
+}
+
+@media (max-width: 768px) {
+  .paged-nav-btn {
+    display: none;
+  }
+
+  .btn-hud .hud-label-hide-sm {
+    display: none;
+  }
+}
+
+html.standalone-ios .reader-top-bar {
+  padding-top: max(var(--safe-top), 47px);
+  height: calc(54px + max(var(--safe-top), 47px));
+}
+
+html.ios-dynamic-island.standalone-ios .reader-top-bar {
+  padding-top: max(var(--safe-top), 56px);
+  height: calc(54px + max(var(--safe-top), 56px));
+}
