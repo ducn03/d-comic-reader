@@ -1,7 +1,7 @@
 /**
  * TruyenQQ Source Adapter (Cheerio DOM Parser)
  */
-const cheerio = require('cheerio');
+const cheerio = require('cheerio/slim');
 const { fetchText } = require('../http-client.cjs');
 const { GENRE_MAP } = require('./genres.cjs');
 

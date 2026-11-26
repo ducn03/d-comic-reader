@@ -1,7 +1,7 @@
 /**
  * NetTruyen Multi-Mirror Fallback Adapter (Cheerio DOM Parser + Concurrent Mirror Race)
  */
-const cheerio = require('cheerio');
+const cheerio = require('cheerio/slim');
 const { fetchText } = require('../http-client.cjs');
 
 const NETTRUYEN_MIRRORS = [

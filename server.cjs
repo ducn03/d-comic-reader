@@ -8,7 +8,7 @@ const path = require('path');
 const os = require('os');
 const zlib = require('zlib');
 const { URL } = require('url');
-const { handleApiRequest } = require('./lib/api-handler.cjs');
+const { handleApiRequest } = require('./api/_lib/api-handler.cjs');
 
 process.on('uncaughtException', (err) => {
   console.error('Server process caught unhandled exception:', err.message);
