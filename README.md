@@ -34,7 +34,7 @@ npm start
 - Điện thoại (cùng Wi-Fi): `http://[IP_CUA_BAN]:3000`
 
 ### 3. Deploy lên Vercel
-Dự án tự động phục vụ giao diện tĩnh từ thư mục `public/` và Serverless Function tại `api/manga.js` (dùng chung core `lib/` với `local-server.cjs`).
+Dự án tự động phục vụ giao diện tĩnh từ thư mục `public/` và Serverless Function tại `api/manga.js` (dùng chung core `lib/` với `server.cjs`).
 
 ---
 
@@ -60,7 +60,7 @@ d-comic-reader/
 │   ├── assets/cover-fallback.svg
 │   ├── css/                     # tokens.css, base.css, views.css, reader.css
 │   └── js/                      # main.js, state.js, api.js, router.js, utils.js, views/
-├── local-server.cjs             # Local HTTP Server (Gzip/Brotli + ETag + Static)
+├── server.cjs                   # Local HTTP Server (Gzip/Brotli + ETag + Static)
 ├── Mo Web Doc Truyen.bat
 └── package.json
 ```

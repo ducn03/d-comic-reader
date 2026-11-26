@@ -39,7 +39,7 @@ module.exports = async (req, res) => {
       sendJsonSafe(res, 200, {
         ok: true,
         entry: 'api/manga.js',
-        version: '3.4',
+        version: '3.5',
         node: process.version,
         loaded: Boolean(handleApiRequest),
         loadError: loadError ? loadError.message : null

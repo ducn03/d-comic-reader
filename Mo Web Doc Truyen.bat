@@ -18,6 +18,6 @@ echo Dang khoi dong Server MangaFlow...
 echo.
 
 start "" "http://localhost:3000"
-node local-server.cjs
+node server.cjs
 
 pause

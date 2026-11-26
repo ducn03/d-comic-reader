@@ -135,7 +135,9 @@ const server = http.createServer(async (req, res) => {
           error: 'api-handler invalid',
           modType: typeof rawApiHandler,
           modKeys: Object.keys(rawApiHandler || {}),
-          defaultKeys: Object.keys(rawApiHandler?.default || {})
+          defaultKeys: Object.keys(rawApiHandler?.default || {}),
+          hasLib: fs.existsSync(path.join(__dirname, 'lib')),
+          cwdFiles: fs.readdirSync(__dirname).slice(0, 15)
         }));
         return;
       }
