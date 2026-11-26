@@ -8,7 +8,7 @@ const path = require('path');
 const os = require('os');
 const zlib = require('zlib');
 const { URL } = require('url');
-const { handleApiRequest } = require('./api/_lib/api-handler.cjs');
+const { handleApiRequest } = require('./lib/api-handler.cjs');
 
 process.on('uncaughtException', (err) => {
   console.error('Server process caught unhandled exception:', err.message);
@@ -125,7 +125,15 @@ const server = http.createServer(async (req, res) => {
   const pathname = urlObj.pathname;
 
   if (pathname.startsWith('/api/')) {
-    await handleApiRequest(req, res);
+    try {
+      await handleApiRequest(req, res);
+    } catch (err) {
+      console.error('Unhandled local API error:', err);
+      if (!res.headersSent) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+      }
+      res.end(JSON.stringify({ error: 'Unhandled server error', detail: err.message }));
+    }
     return;
   }
 

@@ -34,7 +34,7 @@ npm start
 - Điện thoại (cùng Wi-Fi): `http://[IP_CUA_BAN]:3000`
 
 ### 3. Deploy lên Vercel
-Dự án tự động phục vụ giao diện tĩnh từ thư mục `public/` và Serverless Function tại `api/manga.js` (dùng chung core `api/_lib/` với `server.cjs`).
+Dự án được cấu hình trong `vercel.json` để phục vụ static frontend từ `public/` và Serverless Function tại `api/manga.js` (đóng gói kèm `lib/`).
 
 ---
 
@@ -43,17 +43,18 @@ Dự án tự động phục vụ giao diện tĩnh từ thư mục `public/` v�
 ```text
 d-comic-reader/
 ├── api/
-│   ├── manga.js                 # Vercel Serverless Function entry
-│   └── _lib/
-│       ├── api-handler.cjs      # Router API dùng chung (Local & Vercel)
-│       ├── cache.cjs            # LRU TTL Cache + Request Coalescing
-│       ├── http-client.cjs      # Keep-Alive Pool + Gzip/Br + Redirect + SSRF Guard
-│       ├── image-proxy.cjs      # Async Image Proxy + ETag + Size/MIME Guard
-│       └── sources/
-│           ├── genres.cjs       # Danh mục 46 thể loại chuẩn
-│           ├── index.cjs        # Source Orchestrator + Fallback
-│           ├── truyenqq.cjs     # Adapter TruyenQQ (Cheerio/slim)
-│           └── nettruyen.cjs    # Adapter NetTruyen fallback (Cheerio/slim + Mirror Race)
+│   └── manga.js                 # Vercel Serverless Function entry
+├── lib/
+│   ├── api-handler.cjs          # Router API dùng chung (Local & Vercel)
+│   ├── cache.cjs                # LRU TTL Cache + Request Coalescing
+│   ├── http-client.cjs          # Keep-Alive Pool + Gzip/Br + Redirect + SSRF Guard
+│   ├── image-proxy.cjs          # Async Image Proxy + ETag + Size/MIME Guard
+│   └── sources/
+│       ├── genres.cjs           # Danh mục 46 thể loại chuẩn
+│       ├── index.cjs            # Source Orchestrator + Fallback
+│       ├── truyenqq.cjs         # Adapter TruyenQQ (Cheerio/slim)
+│       └── nettruyen.cjs        # Adapter NetTruyen fallback (Cheerio/slim + Mirror Race)
+├── vercel.json                  # Cấu hình static public/ + serverless includeFiles
 ├── public/
 │   ├── index.html
 │   ├── manifest.json

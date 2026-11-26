@@ -2,26 +2,34 @@ let handleApiRequest = null;
 let loadError = null;
 
 try {
-  ({ handleApiRequest } = require('./_lib/api-handler.cjs'));
+  ({ handleApiRequest } = require('../lib/api-handler.cjs'));
 } catch (err) {
   loadError = err;
-  console.error('Failed to load ./_lib/api-handler.cjs:', err);
+  console.error('Failed to load ../lib/api-handler.cjs:', err);
+}
+
+function sendFallbackError(res, message, detail) {
+  const body = { error: message, detail: detail || 'Unknown error' };
+  if (typeof res.status === 'function' && typeof res.json === 'function') {
+    res.status(500).json(body);
+    return;
+  }
+  if (!res.headersSent) {
+    res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+  }
+  res.end(JSON.stringify(body));
 }
 
 module.exports = async (req, res) => {
   if (!handleApiRequest) {
-    const payload = JSON.stringify({
-      error: 'Serverless init failed',
-      detail: loadError ? loadError.message : 'Unknown module load error'
-    });
-    if (typeof res.status === 'function' && typeof res.json === 'function') {
-      res.status(500).json(JSON.parse(payload));
-      return;
-    }
-    res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
-    res.end(payload);
+    sendFallbackError(res, 'Serverless init failed', loadError?.message);
     return;
   }
 
-  await handleApiRequest(req, res);
+  try {
+    await handleApiRequest(req, res);
+  } catch (err) {
+    console.error('Unhandled API error:', err);
+    sendFallbackError(res, 'Unhandled serverless error', err?.message);
+  }
 };

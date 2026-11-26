@@ -1,0 +1,16 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "",
+  "outputDirectory": "public",
+  "functions": {
+    "api/manga.js": {
+      "includeFiles": "lib/**"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/manga/:endpoint",
+      "destination": "/api/manga?endpoint=:endpoint"
+    }
+  ]
+}
