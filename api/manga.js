@@ -1,14 +1,16 @@
 const path = require('path');
 const { URL } = require('url');
 
+const unwrap = (m) => (m && m.default && typeof m.default === 'object' ? { ...m.default, ...m } : m);
+
 let handleApiRequest = null;
 let loadError = null;
 
 try {
-  ({ handleApiRequest } = require('../lib/api-handler.cjs'));
+  ({ handleApiRequest } = unwrap(require('../lib/api-handler.cjs')));
 } catch (err1) {
   try {
-    ({ handleApiRequest } = require(path.join(process.cwd(), 'lib', 'api-handler.cjs')));
+    ({ handleApiRequest } = unwrap(require(path.join(process.cwd(), 'lib', 'api-handler.cjs'))));
   } catch (err2) {
     loadError = err2 || err1;
     console.error('Failed to load lib/api-handler.cjs:', err1?.message, err2?.message);
@@ -37,7 +39,7 @@ module.exports = async (req, res) => {
       sendJsonSafe(res, 200, {
         ok: true,
         entry: 'api/manga.js',
-        version: '3.2',
+        version: '3.3',
         node: process.version,
         loaded: Boolean(handleApiRequest),
         loadError: loadError ? loadError.message : null

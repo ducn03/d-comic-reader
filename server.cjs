@@ -8,7 +8,10 @@ const path = require('path');
 const os = require('os');
 const zlib = require('zlib');
 const { URL } = require('url');
-const { handleApiRequest } = require('./lib/api-handler.cjs');
+const unwrap = (m) => (m && m.default && typeof m.default === 'object' ? { ...m.default, ...m } : m);
+const rawApiHandler = require('./lib/api-handler.cjs');
+const unwrappedApiHandler = unwrap(rawApiHandler);
+const handleApiRequest = unwrappedApiHandler?.handleApiRequest;
 
 process.on('uncaughtException', (err) => {
   console.error('Server process caught unhandled exception:', err.message);
@@ -126,6 +129,16 @@ const server = http.createServer(async (req, res) => {
     const pathname = urlObj.pathname;
 
     if (pathname.startsWith('/api/')) {
+      if (typeof handleApiRequest !== 'function') {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({
+          error: 'api-handler invalid',
+          modType: typeof rawApiHandler,
+          modKeys: Object.keys(rawApiHandler || {}),
+          defaultKeys: Object.keys(rawApiHandler?.default || {})
+        }));
+        return;
+      }
       await handleApiRequest(req, res);
       return;
     }
