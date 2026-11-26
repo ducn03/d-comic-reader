@@ -120,24 +120,26 @@ function serveStatic(req, res, pathname) {
 }
 
 const server = http.createServer(async (req, res) => {
-  const hostHeader = req.headers.host || `localhost:${PORT}`;
-  const urlObj = new URL(req.url, `http://${hostHeader}`);
-  const pathname = urlObj.pathname;
+  try {
+    const hostHeader = req.headers.host || `localhost:${PORT}`;
+    const urlObj = new URL(req.url, `http://${hostHeader}`);
+    const pathname = urlObj.pathname;
 
-  if (pathname.startsWith('/api/')) {
-    try {
+    if (pathname.startsWith('/api/')) {
       await handleApiRequest(req, res);
-    } catch (err) {
-      console.error('Unhandled local API error:', err);
-      if (!res.headersSent) {
-        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
-      }
+      return;
+    }
+
+    serveStatic(req, res, pathname);
+  } catch (err) {
+    console.error('Unhandled request error:', err);
+    if (!res.headersSent) {
+      res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+    }
+    if (!res.writableEnded) {
       res.end(JSON.stringify({ error: 'Unhandled server error', detail: err.message }));
     }
-    return;
   }
-
-  serveStatic(req, res, pathname);
 });
 
 function startServer(port) {

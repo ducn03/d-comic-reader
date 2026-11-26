@@ -34,7 +34,7 @@ npm start
 - Điện thoại (cùng Wi-Fi): `http://[IP_CUA_BAN]:3000`
 
 ### 3. Deploy lên Vercel
-Dự án được cấu hình trong `vercel.json` để phục vụ static frontend từ `public/` và Serverless Function tại `api/manga.js` (đóng gói kèm `lib/`).
+Dự án tự động phục vụ giao diện tĩnh từ thư mục `public/` và Serverless Function tại `api/manga.js` (dùng chung core `lib/` với `server.cjs`).
 
 ---
 
@@ -54,7 +54,6 @@ d-comic-reader/
 │       ├── index.cjs            # Source Orchestrator + Fallback
 │       ├── truyenqq.cjs         # Adapter TruyenQQ (Cheerio/slim)
 │       └── nettruyen.cjs        # Adapter NetTruyen fallback (Cheerio/slim + Mirror Race)
-├── vercel.json                  # Cấu hình static public/ + serverless includeFiles
 ├── public/
 │   ├── index.html
 │   ├── manifest.json
