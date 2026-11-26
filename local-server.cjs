@@ -9,7 +9,7 @@ const os = require('os');
 const zlib = require('zlib');
 const { URL } = require('url');
 const unwrap = (m) => (m && m.default && typeof m.default === 'object' ? { ...m.default, ...m } : m);
-const rawApiHandler = require('./lib/api-handler.cjs');
+const rawApiHandler = require('./lib/api-handler.js');
 const unwrappedApiHandler = unwrap(rawApiHandler);
 const handleApiRequest = unwrappedApiHandler?.handleApiRequest;
 

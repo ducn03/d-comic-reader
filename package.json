@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "description": "High-End Dark Anime & Manga Reader Web Application crawling Hinettruyen live",
   "scripts": {
-    "start": "node server.cjs",
-    "dev": "node server.cjs"
+    "start": "node local-server.cjs",
+    "dev": "node local-server.cjs"
   },
   "dependencies": {
     "cheerio": "^1.1.2"

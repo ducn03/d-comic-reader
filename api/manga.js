@@ -7,13 +7,13 @@ let handleApiRequest = null;
 let loadError = null;
 
 try {
-  ({ handleApiRequest } = unwrap(require('../lib/api-handler.cjs')));
+  ({ handleApiRequest } = unwrap(require('../lib/api-handler.js')));
 } catch (err1) {
   try {
-    ({ handleApiRequest } = unwrap(require(path.join(process.cwd(), 'lib', 'api-handler.cjs'))));
+    ({ handleApiRequest } = unwrap(require(path.join(process.cwd(), 'lib', 'api-handler.js'))));
   } catch (err2) {
     loadError = err2 || err1;
-    console.error('Failed to load lib/api-handler.cjs:', err1?.message, err2?.message);
+    console.error('Failed to load lib/api-handler.js:', err1?.message, err2?.message);
   }
 }
 
@@ -39,7 +39,7 @@ module.exports = async (req, res) => {
       sendJsonSafe(res, 200, {
         ok: true,
         entry: 'api/manga.js',
-        version: '3.3',
+        version: '3.4',
         node: process.version,
         loaded: Boolean(handleApiRequest),
         loadError: loadError ? loadError.message : null
