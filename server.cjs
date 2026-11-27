@@ -90,7 +90,11 @@ function serveStatic(req, res, pathname) {
     }
 
     const cacheControl =
-      ext === '.html' ? 'no-cache, must-revalidate' : 'public, max-age=3600';
+      ext === '.html'
+        ? 'no-cache, must-revalidate'
+        : ext === '.js' || ext === '.mjs' || ext === '.css'
+          ? 'public, max-age=60, must-revalidate'
+          : 'public, max-age=86400';
 
     const headers = {
       'Content-Type': contentType,

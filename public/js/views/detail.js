@@ -4,14 +4,14 @@
  * - Auto-syncs followed bookmark metadata cleanly
  * - Zero heavy GPU blur backdrop
  */
-import { fetchApi, hasCachedApi } from '../api.js';
+import { fetchApi, hasCachedApi } from '../api.js?v=4.0';
 import {
   state,
   isBookmarked,
   toggleFavorite,
   getReadingProgress,
   syncSingleBookmarkFromComic
-} from '../state.js';
+} from '../state.js?v=4.0';
 import {
   escapeHtml,
   debounce,
@@ -20,8 +20,8 @@ import {
   showToast,
   showSpinner,
   hideSpinner
-} from '../utils.js';
-import { navigateTo, switchView, restoreViewScroll } from '../router.js';
+} from '../utils.js?v=4.0';
+import { navigateTo, switchView, restoreViewScroll } from '../router.js?v=4.0';
 
 const CHUNK_SIZE = 100;
 let activeChunkIndex = 0;

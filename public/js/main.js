@@ -4,31 +4,31 @@
  * - Global navigation (Keep-Alive tab memory, zero-loop back)
  * - Route registration
  */
-import { state, updateBookmarkBadge } from './state.js';
+import { state, updateBookmarkBadge } from './state.js?v=4.0';
 import {
   registerRoutes,
   navigateTo,
   goBack,
   initRouter,
   getLastExploreHash
-} from './router.js';
+} from './router.js?v=4.0';
 import {
   initHomeInteractions,
   loadHomeView,
   loadSearchView
-} from './views/home.js';
-import { initDetailInteractions, loadDetailView } from './views/detail.js';
+} from './views/home.js?v=4.0';
+import { initDetailInteractions, loadDetailView } from './views/detail.js?v=4.0';
 import {
   initReaderInteractions,
   loadReaderView,
   cleanupReader,
   handleReaderKeydown
-} from './views/reader.js';
+} from './views/reader.js?v=4.0';
 import {
   initLibraryInteractions,
   loadBookmarksView,
   loadHistoryView
-} from './views/library.js';
+} from './views/library.js?v=4.0';
 
 (function initIosStandaloneDetector() {
   const isIOS =

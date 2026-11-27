@@ -8,7 +8,7 @@ import {
   parseVietnameseTimeWithPrecision,
   isSameLocalDay,
   formatChapterTimeLabel
-} from './utils.js';
+} from './utils.js?v=4.0';
 
 const STORAGE_KEYS = {
   BOOKMARKS: 'mf_bookmarks',

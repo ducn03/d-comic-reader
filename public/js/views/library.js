@@ -3,7 +3,7 @@
  * - Bookmarks with accurate release-time sorting, 2-tier full sync, unread filter chip, and overflow menu
  * - Keep-Alive DOM signatures so returning to Bookmarks / History preserves state without flicker
  */
-import { fetchApi } from '../api.js';
+import { fetchApi } from '../api.js?v=4.0';
 import {
   state,
   compactBookmark,
@@ -18,17 +18,17 @@ import {
   removeHistoryItem,
   clearAllHistory,
   getReadingProgress
-} from '../state.js';
+} from '../state.js?v=4.0';
 import {
   escapeHtml,
   debounce,
   getProxyImageUrl,
   FALLBACK_COVER,
   showToast
-} from '../utils.js';
-import { ICONS } from '../icons.js';
-import { navigateTo, switchView, restoreViewScroll } from '../router.js';
-import { renderComicsGrid } from './home.js';
+} from '../utils.js?v=4.0';
+import { ICONS } from '../icons.js?v=4.0';
+import { navigateTo, switchView, restoreViewScroll } from '../router.js?v=4.0';
+import { renderComicsGrid } from './home.js?v=4.0';
 
 let syncAbort = null;
 let lastFullSyncTime = 0;

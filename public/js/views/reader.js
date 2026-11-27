@@ -5,7 +5,7 @@
  * - No content-visibility thrashing or scroll-time ResizeObserver/localStorage blocking
  * - 6 concurrent image streams with generous lookahead
  */
-import { fetchApi, hasCachedApi } from '../api.js';
+import { fetchApi, hasCachedApi } from '../api.js?v=4.0';
 import {
   state,
   isBookmarked,
@@ -17,10 +17,10 @@ import {
   updateHistoryCover,
   saveReaderSettings,
   syncSingleBookmarkFromComic
-} from '../state.js';
-import { debounce, getProxyImageUrl, showToast } from '../utils.js';
-import { ICONS } from '../icons.js';
-import { navigateTo, goBackFromReader, switchView } from '../router.js';
+} from '../state.js?v=4.0';
+import { debounce, getProxyImageUrl, showToast } from '../utils.js?v=4.0';
+import { ICONS } from '../icons.js?v=4.0';
+import { navigateTo, goBackFromReader, switchView } from '../router.js?v=4.0';
 
 const MAX_CONCURRENT_IMAGES = 6;
 const DRAWER_CHUNK_SIZE = 100;

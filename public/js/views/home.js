@@ -2,17 +2,17 @@
  * Home, Filter, Genre, Search, Live Suggestions, Pagination, Continue Reading Strip & Genres Modal.
  * Keep-Alive DOM avoids clearing/re-rendering when returning to the active view.
  */
-import { fetchApi, hasCachedApi } from '../api.js';
+import { fetchApi, hasCachedApi } from '../api.js?v=4.0';
 import {
   state,
   isBookmarked,
   toggleFavorite,
   addSearchHistory,
   getReadingProgress
-} from '../state.js';
-import { escapeHtml, debounce, getProxyImageUrl, FALLBACK_COVER, showToast } from '../utils.js';
-import { ICONS } from '../icons.js';
-import { navigateTo, switchView, restoreViewScroll } from '../router.js';
+} from '../state.js?v=4.0';
+import { escapeHtml, debounce, getProxyImageUrl, FALLBACK_COVER, showToast } from '../utils.js?v=4.0';
+import { ICONS } from '../icons.js?v=4.0';
+import { navigateTo, switchView, restoreViewScroll } from '../router.js?v=4.0';
 
 const FALLBACK_GENRES = [
   { slug: 'action', name: 'Action' },

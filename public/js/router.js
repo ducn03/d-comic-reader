@@ -2,7 +2,7 @@
  * Non-blocking SPA Hash Router with Hierarchical Navigation Stack (prevents Back loops),
  * Keep-Alive Explore/Tab History, AbortController, and Scroll Restoration.
  */
-import { state } from './state.js';
+import { state } from './state.js?v=4.0';
 
 let routeSeq = 0;
 let activeController = null;

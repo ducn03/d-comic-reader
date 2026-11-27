@@ -5,7 +5,7 @@
  * - AbortSignal-aware fetch
  * - Gentle single-slot intent prefetch
  */
-import { getApiBase } from './utils.js';
+import { getApiBase } from './utils.js?v=4.0';
 
 const MAX_CACHE_ENTRIES = 80;
 const memoryCache = new Map();
