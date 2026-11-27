@@ -1,22 +1,90 @@
 /**
  * Comic Detail View:
- * - Optimistic render + full metadata
- * - "Continue Reading" button & progress tracking
- * - Chunked Chapter Tabs (handles 1,500+ chapters smoothly) + Debounced Search + Event Delegation
+ * - Keep-Alive DOM & Per-Slug UI State (preserves sort order, chunk tab, filter text across Reader returns)
+ * - Auto-syncs followed bookmark metadata cleanly
+ * - Zero heavy GPU blur backdrop
  */
 import { fetchApi, hasCachedApi } from '../api.js';
-import { state, isBookmarked, toggleFavorite, getReadingProgress } from '../state.js';
-import { escapeHtml, debounce, getProxyImageUrl, FALLBACK_COVER, showToast, showSpinner, hideSpinner } from '../utils.js';
+import {
+  state,
+  isBookmarked,
+  toggleFavorite,
+  getReadingProgress,
+  syncSingleBookmarkFromComic
+} from '../state.js';
+import {
+  escapeHtml,
+  debounce,
+  getProxyImageUrl,
+  FALLBACK_COVER,
+  showToast,
+  showSpinner,
+  hideSpinner
+} from '../utils.js';
 import { navigateTo, switchView, restoreViewScroll } from '../router.js';
 
 const CHUNK_SIZE = 100;
 let activeChunkIndex = 0;
+let renderedDetailSlug = '';
+
+// Remember per-comic UI controls (sortAsc, chunkIndex, filterText) across Reader round-trips
+const detailUiState = new Map();
+
+function saveDetailUiState(slug) {
+  if (!slug) return;
+  const searchInput = document.getElementById('chapter-search-input');
+  if (detailUiState.size >= 50 && !detailUiState.has(slug)) {
+    const oldest = detailUiState.keys().next().value;
+    if (oldest) detailUiState.delete(oldest);
+  }
+  detailUiState.set(slug, {
+    sortAsc: Boolean(state.chapterSortAsc),
+    chunkIndex: activeChunkIndex,
+    filterText: searchInput ? searchInput.value : ''
+  });
+}
+
+function getDetailUiState(slug) {
+  return detailUiState.get(slug) || { sortAsc: false, chunkIndex: 0, filterText: '' };
+}
 
 function updateDetailFavIcon(isFav) {
   const btn = document.getElementById('btn-favorite-toggle');
   const icon = document.getElementById('favorite-heart-icon');
   if (btn) btn.classList.toggle('active', isFav);
   if (icon) icon.setAttribute('fill', isFav ? 'currentColor' : 'none');
+}
+
+function updateDynamicProgressSection(detail) {
+  const readSet = new Set(state.readChapters[detail.slug] || []);
+  const progEl = document.getElementById('detail-read-progress');
+  if (progEl) {
+    if (readSet.size > 0 && state.chaptersList.length > 0) {
+      progEl.textContent = `Đã đọc ${readSet.size}/${state.chaptersList.length}`;
+      progEl.classList.remove('hidden');
+    } else {
+      progEl.classList.add('hidden');
+    }
+  }
+
+  const continueBtn = document.getElementById('btn-read-continue');
+  const continueLabel = document.getElementById('read-continue-label');
+  const progress = getReadingProgress(detail.slug);
+  const histMatch = state.history.find((h) => h.slug === detail.slug);
+  const resumeSlug = progress?.chapterSlug || histMatch?.chapterSlug || '';
+  const resumeTitle = progress?.chapterTitle || histMatch?.chapterTitle || resumeSlug;
+
+  if (resumeSlug && continueBtn && continueLabel) {
+    const pageHint = progress?.pageIndex > 0 ? ` (Tr.${progress.pageIndex + 1})` : '';
+    continueLabel.textContent = `Đọc tiếp: ${resumeTitle}${pageHint}`;
+    continueBtn.classList.remove('hidden');
+    continueBtn.onclick = () => {
+      saveDetailUiState(detail.slug);
+      navigateTo(`#read/${encodeURIComponent(detail.slug)}/${encodeURIComponent(resumeSlug)}`);
+    };
+  } else if (continueBtn) {
+    continueBtn.classList.add('hidden');
+  }
 }
 
 function getFilteredChapters(filterText) {
@@ -74,7 +142,7 @@ export function renderChapterButtons(filterText = '') {
   if (list.length === 0) {
     chunksBar?.classList.add('hidden');
     listEl.innerHTML =
-      '<div style="grid-column: 1 / -1; text-align: center; color: var(--text-dim); padding: 22px;">Không tìm thấy chương nào khớp!</div>';
+      '<div style="grid-column: 1 / -1; text-align: center; color: var(--text-dim); padding: 22px;">Không tìm thấy chương nào khớp.</div>';
     return;
   }
 
@@ -90,7 +158,8 @@ export function renderChapterButtons(filterText = '') {
   const slug = state.currentComic.slug;
   const readSet = new Set(state.readChapters[slug] || []);
   const progress = getReadingProgress(slug);
-  const currentChapSlug = progress?.chapterSlug || state.history.find((h) => h.slug === slug)?.chapterSlug || '';
+  const currentChapSlug =
+    progress?.chapterSlug || state.history.find((h) => h.slug === slug)?.chapterSlug || '';
 
   listEl.innerHTML = '';
   const frag = document.createDocumentFragment();
@@ -110,6 +179,25 @@ export function renderChapterButtons(filterText = '') {
 }
 
 export async function loadDetailView(slug, hashKey, ctx) {
+  const searchInput = document.getElementById('chapter-search-input');
+  const sortOrderText = document.getElementById('sort-order-text');
+
+  // Keep-Alive Fast Path: Returning to the exact same comic from Reader
+  if (renderedDetailSlug === slug && state.currentComic?.slug === slug && state.chaptersList.length > 0) {
+    const savedUi = getDetailUiState(slug);
+    state.chapterSortAsc = savedUi.sortAsc;
+    activeChunkIndex = savedUi.chunkIndex;
+    if (searchInput) searchInput.value = savedUi.filterText;
+    if (sortOrderText) sortOrderText.textContent = state.chapterSortAsc ? 'Cũ nhất' : 'Mới nhất';
+
+    updateDetailFavIcon(isBookmarked(slug));
+    updateDynamicProgressSection(state.currentComic);
+    renderChapterButtons(savedUi.filterText);
+    switchView('detail', hashKey);
+    restoreViewScroll(hashKey, 0);
+    return;
+  }
+
   const existing =
     (state.loadedComics || []).find((c) => c.slug === slug) ||
     (state.bookmarks || []).find((c) => c.slug === slug) ||
@@ -117,21 +205,18 @@ export async function loadDetailView(slug, hashKey, ctx) {
 
   const titleEl = document.getElementById('detail-title');
   const coverEl = document.getElementById('detail-cover');
-  const backdropEl = document.getElementById('detail-backdrop');
 
   if (existing) {
     titleEl.textContent = existing.title || slug;
     if (existing.cover) {
-      const cUrl = getProxyImageUrl(existing.cover);
-      coverEl.src = cUrl;
-      backdropEl.style.backgroundImage = `url(${cUrl})`;
+      coverEl.src = getProxyImageUrl(existing.cover);
     }
-    switchView('detail');
+    switchView('detail', hashKey);
   }
 
   const isCached = hasCachedApi('detail', { slug }, 300000);
   if (!isCached && !existing) {
-    showSpinner('Đang tải thông tin truyện & danh sách chương...');
+    showSpinner('Đang tải thông tin truyện...');
   }
 
   try {
@@ -140,19 +225,21 @@ export async function loadDetailView(slug, hashKey, ctx) {
     if (ctx.isStale()) return;
 
     if (!detail || !detail.title) {
-      showToast('Không tìm thấy thông tin truyện!');
+      showToast('Không tìm thấy thông tin truyện.');
       return;
     }
 
     state.currentComic = detail;
     state.chaptersList = detail.chapters || [];
-    state.chapterSortAsc = false;
-    activeChunkIndex = 0;
+    renderedDetailSlug = slug;
 
-    const searchInput = document.getElementById('chapter-search-input');
-    const sortOrderText = document.getElementById('sort-order-text');
-    if (searchInput) searchInput.value = '';
-    if (sortOrderText) sortOrderText.textContent = 'Mới nhất';
+    syncSingleBookmarkFromComic(detail);
+
+    const savedUi = getDetailUiState(slug);
+    state.chapterSortAsc = savedUi.sortAsc;
+    activeChunkIndex = savedUi.chunkIndex;
+    if (searchInput) searchInput.value = savedUi.filterText;
+    if (sortOrderText) sortOrderText.textContent = state.chapterSortAsc ? 'Cũ nhất' : 'Mới nhất';
 
     titleEl.textContent = detail.title;
     const coverUrl = getProxyImageUrl(detail.cover);
@@ -161,7 +248,6 @@ export async function loadDetailView(slug, hashKey, ctx) {
       coverEl.onerror = null;
       coverEl.src = FALLBACK_COVER;
     };
-    backdropEl.style.backgroundImage = `url(${coverUrl})`;
 
     document.getElementById('detail-author').textContent = detail.author || 'Đang cập nhật';
     document.getElementById('detail-status').textContent = detail.status || 'Đang cập nhật';
@@ -193,38 +279,10 @@ export async function loadDetailView(slug, hashKey, ctx) {
       .join('');
 
     updateDetailFavIcon(isBookmarked(detail.slug));
+    updateDynamicProgressSection(detail);
 
-    // Continue reading & progress indicator
-    const readSet = new Set(state.readChapters[detail.slug] || []);
-    const progEl = document.getElementById('detail-read-progress');
-    if (progEl) {
-      if (readSet.size > 0 && state.chaptersList.length > 0) {
-        progEl.textContent = `Đã đọc ${readSet.size}/${state.chaptersList.length}`;
-        progEl.classList.remove('hidden');
-      } else {
-        progEl.classList.add('hidden');
-      }
-    }
-
-    const continueBtn = document.getElementById('btn-read-continue');
-    const continueLabel = document.getElementById('read-continue-label');
     const firstBtn = document.getElementById('btn-read-first');
     const latestBtn = document.getElementById('btn-read-latest');
-
-    const progress = getReadingProgress(detail.slug);
-    const histMatch = state.history.find((h) => h.slug === detail.slug);
-    const resumeSlug = progress?.chapterSlug || histMatch?.chapterSlug || '';
-    const resumeTitle = progress?.chapterTitle || histMatch?.chapterTitle || resumeSlug;
-
-    if (resumeSlug && continueBtn && continueLabel) {
-      const pageHint = progress?.pageIndex > 0 ? ` (Trang ${progress.pageIndex + 1})` : '';
-      continueLabel.textContent = `Đọc tiếp: ${resumeTitle}${pageHint}`;
-      continueBtn.classList.remove('hidden');
-      continueBtn.onclick = () =>
-        navigateTo(`#read/${encodeURIComponent(detail.slug)}/${encodeURIComponent(resumeSlug)}`);
-    } else if (continueBtn) {
-      continueBtn.classList.add('hidden');
-    }
 
     if (state.chaptersList.length > 0) {
       const firstChap = state.chaptersList[state.chaptersList.length - 1];
@@ -232,17 +290,21 @@ export async function loadDetailView(slug, hashKey, ctx) {
 
       firstBtn.disabled = false;
       latestBtn.disabled = false;
-      firstBtn.onclick = () =>
+      firstBtn.onclick = () => {
+        saveDetailUiState(detail.slug);
         navigateTo(`#read/${encodeURIComponent(detail.slug)}/${encodeURIComponent(firstChap.chapterSlug)}`);
-      latestBtn.onclick = () =>
+      };
+      latestBtn.onclick = () => {
+        saveDetailUiState(detail.slug);
         navigateTo(`#read/${encodeURIComponent(detail.slug)}/${encodeURIComponent(latestChap.chapterSlug)}`);
+      };
     } else {
       firstBtn.disabled = true;
       latestBtn.disabled = true;
     }
 
-    renderChapterButtons('');
-    switchView('detail');
+    renderChapterButtons(savedUi.filterText);
+    switchView('detail', hashKey);
     restoreViewScroll(hashKey, 0);
   } catch (err) {
     hideSpinner();
@@ -259,7 +321,7 @@ export function initDetailInteractions() {
     updateDetailFavIcon(res.added);
     showToast(
       res.added
-        ? `❤️ Đã theo dõi "${state.currentComic.title}"`
+        ? `Đã theo dõi "${state.currentComic.title}"`
         : `Đã bỏ theo dõi "${state.currentComic.title}"`
     );
   });
@@ -277,6 +339,7 @@ export function initDetailInteractions() {
     'input',
     debounce((e) => {
       activeChunkIndex = 0;
+      saveDetailUiState(state.currentComic?.slug);
       renderChapterButtons(e.target.value);
     }, 150)
   );
@@ -287,6 +350,7 @@ export function initDetailInteractions() {
     activeChunkIndex = 0;
     const sortText = document.getElementById('sort-order-text');
     if (sortText) sortText.textContent = state.chapterSortAsc ? 'Cũ nhất' : 'Mới nhất';
+    saveDetailUiState(state.currentComic?.slug);
     renderChapterButtons(chapSearchInput?.value || '');
   });
 
@@ -295,6 +359,7 @@ export function initDetailInteractions() {
     const btn = e.target.closest('.chunk-tab-btn');
     if (!btn) return;
     activeChunkIndex = parseInt(btn.dataset.chunk || '0', 10) || 0;
+    saveDetailUiState(state.currentComic?.slug);
     renderChapterButtons(chapSearchInput?.value || '');
   });
 
@@ -302,6 +367,7 @@ export function initDetailInteractions() {
   chaptersList?.addEventListener('click', (e) => {
     const btn = e.target.closest('.chapter-btn');
     if (!btn?.dataset.chap || !state.currentComic) return;
+    saveDetailUiState(state.currentComic.slug);
     navigateTo(
       `#read/${encodeURIComponent(state.currentComic.slug)}/${encodeURIComponent(btn.dataset.chap)}`
     );

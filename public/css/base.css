@@ -103,33 +103,31 @@ a,
 .logo {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   text-decoration: none;
   color: var(--text-main);
 }
 
-.logo-icon {
-  font-size: 25px;
-  line-height: 1;
+.logo-mark {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  background: var(--accent-primary);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 .logo-title {
-  font-size: 19px;
-  font-weight: 900;
-  letter-spacing: -0.5px;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.4px;
 }
 
 .logo-title .highlight {
   color: var(--accent-primary);
-}
-
-.logo-sub {
-  display: block;
-  font-size: 9px;
-  font-weight: 700;
-  color: var(--text-dim);
-  text-transform: uppercase;
-  letter-spacing: 0.9px;
 }
 
 /* ==================== Search Box & Dropdown ==================== */
@@ -182,8 +180,10 @@ a,
   border: none;
   color: var(--text-dim);
   cursor: pointer;
-  padding: 4px 8px;
-  font-size: 13px;
+  padding: 4px 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .search-submit-btn {
@@ -358,17 +358,6 @@ a,
   font-weight: 800;
 }
 
-.btn-dice {
-  background: rgba(245, 158, 11, 0.12);
-  color: var(--accent-gold);
-  border: 1px solid rgba(245, 158, 11, 0.28);
-}
-
-.btn-dice:hover {
-  background: var(--accent-gold);
-  color: #000;
-}
-
 /* ==================== Main Container & Views ==================== */
 .main-content {
   max-width: 1440px;
@@ -535,7 +524,7 @@ body.in-reader .main-content {
 
 .genres-modal-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(135px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
   gap: 8px;
   overflow-y: auto;
 }
@@ -548,7 +537,8 @@ body.in-reader .main-content {
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  text-align: center;
   transition: background-color 0.12s, border-color 0.12s;
 }
 
@@ -721,11 +711,12 @@ body.in-reader .main-content {
   }
 
   .logo-title {
-    font-size: 17px;
+    font-size: 16.5px;
   }
 
-  .logo-sub {
-    display: none;
+  .logo-mark {
+    width: 25px;
+    height: 25px;
   }
 
   .search-wrapper {

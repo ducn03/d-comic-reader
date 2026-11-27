@@ -1,16 +1,21 @@
 /**
  * MangaFlow Entry Point:
  * - iOS Standalone PWA safe area detection
- * - Global navigation & keyboard wiring
+ * - Global navigation (Keep-Alive tab memory, zero-loop back)
  * - Route registration
  */
 import { state, updateBookmarkBadge } from './state.js';
-import { registerRoutes, navigateTo, goBack, initRouter } from './router.js';
+import {
+  registerRoutes,
+  navigateTo,
+  goBack,
+  initRouter,
+  getLastExploreHash
+} from './router.js';
 import {
   initHomeInteractions,
   loadHomeView,
-  loadSearchView,
-  openRandomComic
+  loadSearchView
 } from './views/home.js';
 import { initDetailInteractions, loadDetailView } from './views/detail.js';
 import {
@@ -115,10 +120,35 @@ registerRoutes(async (rawHash, ctx) => {
   return true;
 });
 
+function handleTabClick(tabName) {
+  if (tabName === 'home') {
+    if (state.currentView !== 'home') {
+      navigateTo(getLastExploreHash() || '#home');
+      return;
+    }
+    const currentHash = window.location.hash || '#home';
+    if (currentHash !== '#home' && currentHash !== '') {
+      navigateTo('#home');
+    } else {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    return;
+  }
+
+  if (state.currentView === tabName) {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    return;
+  }
+  navigateTo(`#${tabName}`);
+}
+
 // Wire global header & nav
 document.getElementById('logo-link')?.addEventListener('click', (e) => {
   e.preventDefault();
-  navigateTo('#home');
+  if ((window.location.hash || '#home') !== '#home' || state.currentView !== 'home') {
+    navigateTo('#home');
+  }
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 });
 
 document.getElementById('btn-back-global')?.addEventListener('click', () => {
@@ -126,15 +156,12 @@ document.getElementById('btn-back-global')?.addEventListener('click', () => {
 });
 
 document.querySelectorAll('.nav-actions .nav-btn[data-tab]').forEach((btn) => {
-  btn.addEventListener('click', () => navigateTo(`#${btn.dataset.tab}`));
+  btn.addEventListener('click', () => handleTabClick(btn.dataset.tab));
 });
 
 document.querySelectorAll('.mobile-bottom-nav .m-nav-item[data-tab]').forEach((btn) => {
-  btn.addEventListener('click', () => navigateTo(`#${btn.dataset.tab}`));
+  btn.addEventListener('click', () => handleTabClick(btn.dataset.tab));
 });
-
-document.getElementById('btn-random-manga')?.addEventListener('click', openRandomComic);
-document.getElementById('btn-m-random')?.addEventListener('click', openRandomComic);
 
 window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {

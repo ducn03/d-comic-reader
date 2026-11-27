@@ -1,13 +1,9 @@
 /**
- * Modern Reader View:
- * - Tap-to-Toggle Top & Bottom HUD
- * - Concurrency-limited IntersectionObserver Image Preloader (Webtoon)
- * - Instant Next/Prev Image Preloading + Swipe/Tap Zones (Paged LTR & RTL)
- * - Auto-save & restore reading position (page index)
- * - Smooth deltaTime Auto-Scroll (60Hz / 120Hz / 144Hz consistent)
- * - GPU-only Progress Bar (scaleX, zero reflow)
- * - Reader Settings Sheet (persisted to LocalStorage)
- * - Chunked Chapter Drawer
+ * Minimal, Smooth 60/120fps Reader View:
+ * - Zero-loop Back & replaceState chapter transitions
+ * - Clean Tap vs Scroll/Drag gesture recognition (no accidental HUD flicker)
+ * - No content-visibility thrashing or scroll-time ResizeObserver/localStorage blocking
+ * - 6 concurrent image streams with generous lookahead
  */
 import { fetchApi, hasCachedApi } from '../api.js';
 import {
@@ -19,12 +15,14 @@ import {
   getReadingProgress,
   addToHistory,
   updateHistoryCover,
-  saveReaderSettings
+  saveReaderSettings,
+  syncSingleBookmarkFromComic
 } from '../state.js';
 import { debounce, getProxyImageUrl, showToast } from '../utils.js';
-import { navigateTo, switchView } from '../router.js';
+import { ICONS } from '../icons.js';
+import { navigateTo, goBackFromReader, switchView } from '../router.js';
 
-const MAX_CONCURRENT_IMAGES = 4;
+const MAX_CONCURRENT_IMAGES = 6;
 const DRAWER_CHUNK_SIZE = 100;
 
 let hudVisible = true;
@@ -35,10 +33,11 @@ let autoScrollAcc = 0;
 
 let webtoonLoadObserver = null;
 let webtoonTrackObserver = null;
-let docResizeObserver = null;
 let cachedDocScrollable = 1;
 let scrollRafPending = false;
 let lastScrollY = 0;
+let downwardScrollAcc = 0;
+let idleSaveTimer = null;
 
 let currentImages = [];
 let currentPageIndex = 0;
@@ -100,12 +99,26 @@ function syncSettingsSheetUI() {
   if (speedVal) speedVal.textContent = `${s.autoScrollSpeed || 90} px/s`;
 }
 
-// ==================== HUD Controls ====================
+// ==================== HUD & Idle Persistence ====================
+
+function syncHudPageDisplay() {
+  const total = currentImages.length;
+  const counter = document.getElementById('reader-page-counter');
+  const scrubber = document.getElementById('reader-hud-scrubber');
+
+  if (counter) counter.textContent = `${total > 0 ? currentPageIndex + 1 : 0} / ${total}`;
+  if (scrubber) {
+    scrubber.max = String(Math.max(1, total));
+    scrubber.value = String(Math.min(total || 1, currentPageIndex + 1));
+  }
+}
 
 function setHudVisible(visible) {
   hudVisible = visible;
+  downwardScrollAcc = 0;
   const topBar = document.getElementById('reader-top-bar');
   const bottomBar = document.getElementById('reader-bottom-bar');
+  if (visible) syncHudPageDisplay();
   topBar?.classList.toggle('hud-hidden', !visible);
   bottomBar?.classList.toggle('hud-hidden', !visible);
 }
@@ -113,6 +126,20 @@ function setHudVisible(visible) {
 function toggleHud() {
   setHudVisible(!hudVisible);
 }
+
+function measureScrollableHeight() {
+  cachedDocScrollable = Math.max(
+    1,
+    document.documentElement.scrollHeight - window.innerHeight
+  );
+  updateProgressBar();
+}
+
+const scheduleMeasureHeight = debounce(() => {
+  if (state.currentView === 'reader') {
+    requestAnimationFrame(measureScrollableHeight);
+  }
+}, 150);
 
 function updateProgressBar() {
   const bar = document.getElementById('read-progress-bar');
@@ -132,31 +159,27 @@ function updateProgressBar() {
   bar.style.transform = `scaleX(${Math.max(0, Math.min(1, ratio))})`;
 }
 
-function updatePageCounterUI(index) {
+function scheduleIdleProgressSave() {
+  clearTimeout(idleSaveTimer);
+  idleSaveTimer = setTimeout(() => {
+    persistCurrentProgress();
+  }, 2000);
+}
+
+function updatePageIndex(index) {
   currentPageIndex = Math.max(0, Math.min(index, Math.max(0, currentImages.length - 1)));
-  const total = currentImages.length;
-  const counter = document.getElementById('reader-page-counter');
-  const scrubber = document.getElementById('reader-hud-scrubber');
-
-  if (counter) counter.textContent = `Trang ${total > 0 ? currentPageIndex + 1 : 0} / ${total}`;
-  if (scrubber) {
-    scrubber.max = String(Math.max(1, total));
-    scrubber.value = String(Math.min(total || 1, currentPageIndex + 1));
+  if (hudVisible) {
+    syncHudPageDisplay();
   }
-
   if (state.readerSettings.mode === 'paged') {
     updateProgressBar();
   }
-
   maybePrefetchNextChapter();
-  debouncedSaveProgress();
+  scheduleIdleProgressSave();
 }
 
-const debouncedSaveProgress = debounce(() => {
-  persistCurrentProgress();
-}, 1000);
-
 function persistCurrentProgress() {
+  clearTimeout(idleSaveTimer);
   if (state.currentView !== 'reader' || !state.readingComicSlug || !state.readingChapterSlug) return;
   const total = currentImages.length;
   if (!total) return;
@@ -188,7 +211,7 @@ function maybePrefetchNextChapter() {
   fetchApi('chapter', { slug, chapter: nextSlug }, { ttlMs: 1800000 })
     .then((nextData) => {
       if (nextData?.images?.length) {
-        nextData.images.slice(0, 2).forEach((rawUrl) => {
+        nextData.images.slice(0, 3).forEach((rawUrl) => {
           const proxied = getProxyImageUrl(rawUrl);
           if (!preloadedUrls.has(proxied)) {
             const img = new Image();
@@ -212,10 +235,6 @@ function disconnectObservers() {
   if (webtoonTrackObserver) {
     webtoonTrackObserver.disconnect();
     webtoonTrackObserver = null;
-  }
-  if (docResizeObserver) {
-    docResizeObserver.disconnect();
-    docResizeObserver = null;
   }
 }
 
@@ -249,6 +268,7 @@ function renderWebtoonPages(images, token) {
         wrapper.classList.remove('is-loading');
         wrapper.querySelector('.reader-page-error')?.remove();
         img.classList.remove('hidden');
+        scheduleMeasureHeight();
         resolve();
       };
 
@@ -270,7 +290,7 @@ function renderWebtoonPages(images, token) {
           label.textContent = `Không tải được trang ${Number(wrapper.dataset.index) + 1}`;
           const retryBtn = document.createElement('button');
           retryBtn.className = 'btn btn-sm btn-primary';
-          retryBtn.textContent = '↻ Tải lại';
+          retryBtn.innerHTML = `${ICONS.refresh(14)}<span>Tải lại</span>`;
           retryBtn.onclick = (e) => {
             e.stopPropagation();
             errBox.remove();
@@ -281,6 +301,7 @@ function renderWebtoonPages(images, token) {
           errBox.appendChild(retryBtn);
           wrapper.appendChild(errBox);
         }
+        scheduleMeasureHeight();
         resolve();
       };
 
@@ -301,7 +322,7 @@ function renderWebtoonPages(images, token) {
     }
   }
 
-  function enqueueWrapper(wrapper, front = false) {
+  function enqueueWrapper(wrapper) {
     if (wrapper.dataset.loaded === '1' || queuedSet.has(wrapper)) return;
     const idx = Number(wrapper.dataset.index);
     const img = wrapper.querySelector('img');
@@ -309,26 +330,24 @@ function renderWebtoonPages(images, token) {
     if (!img || !rawUrl) return;
 
     queuedSet.add(wrapper);
-    const item = { wrapper, img, rawUrl };
-    if (front) queue.unshift(item);
-    else queue.push(item);
+    queue.push({ wrapper, img, rawUrl });
     pumpQueue();
   }
 
   const frag = document.createDocumentFragment();
   const wrappers = [];
 
-  images.forEach((rawUrl, idx) => {
+  images.forEach((_, idx) => {
     const wrapper = document.createElement('div');
     wrapper.className = 'reader-page-wrapper is-loading';
     wrapper.dataset.index = String(idx);
-    wrapper.dataset.pageLabel = `Trang ${idx + 1} / ${images.length}`;
+    wrapper.dataset.pageLabel = `${idx + 1} / ${images.length}`;
 
     const img = document.createElement('img');
     img.className = 'reader-page-img';
     img.alt = `Trang ${idx + 1}`;
     img.decoding = 'async';
-    if (idx < 3) img.setAttribute('fetchpriority', 'high');
+    if (idx < 4) img.setAttribute('fetchpriority', 'high');
 
     const badge = document.createElement('span');
     badge.className = 'page-num-badge';
@@ -342,20 +361,18 @@ function renderWebtoonPages(images, token) {
 
   container.appendChild(frag);
 
-  // Preload observer with generous rootMargin
   webtoonLoadObserver = new IntersectionObserver(
     (entries) => {
       for (const entry of entries) {
         if (entry.isIntersecting) {
-          enqueueWrapper(entry.target, false);
+          enqueueWrapper(entry.target);
           webtoonLoadObserver?.unobserve(entry.target);
         }
       }
     },
-    { rootMargin: '1800px 0px' }
+    { rootMargin: '2400px 0px' }
   );
 
-  // Visible page tracking observer
   webtoonTrackObserver = new IntersectionObserver(
     (entries) => {
       let bestIdx = null;
@@ -366,29 +383,19 @@ function renderWebtoonPages(images, token) {
         }
       }
       if (bestIdx !== null) {
-        updatePageCounterUI(bestIdx);
+        updatePageIndex(bestIdx);
       }
     },
     { threshold: 0.15 }
   );
 
   wrappers.forEach((w, idx) => {
-    if (idx < 4) enqueueWrapper(w, false);
+    if (idx < 5) enqueueWrapper(w);
     else webtoonLoadObserver.observe(w);
     webtoonTrackObserver.observe(w);
   });
 
-  // Track document height without scroll-time reflow
-  const measureHeight = () => {
-    cachedDocScrollable = Math.max(
-      1,
-      document.documentElement.scrollHeight - window.innerHeight
-    );
-    updateProgressBar();
-  };
-  docResizeObserver = new ResizeObserver(measureHeight);
-  docResizeObserver.observe(container);
-  measureHeight();
+  requestAnimationFrame(measureScrollableHeight);
 }
 
 // ==================== Paged Mode ====================
@@ -421,7 +428,7 @@ function renderPagedPage(index) {
 
   if (!imgEl || !currentImages.length) return;
   const safeIdx = Math.max(0, Math.min(index, currentImages.length - 1));
-  updatePageCounterUI(safeIdx);
+  updatePageIndex(safeIdx);
 
   const rawUrl = currentImages[safeIdx];
   const proxied = getProxyImageUrl(rawUrl);
@@ -471,23 +478,24 @@ function renderPagedPage(index) {
   if (nextBtn) nextBtn.style.opacity = safeIdx < currentImages.length - 1 ? '0.85' : '0.25';
 }
 
+function goToChapter(slug, chapSlug) {
+  if (!slug || !chapSlug) return;
+  persistCurrentProgress();
+  // Always replace history entry when switching chapters inside Reader (zero history bloat / zero loop!)
+  navigateTo(`#read/${encodeURIComponent(slug)}/${encodeURIComponent(chapSlug)}`, {
+    replace: true
+  });
+}
+
 function stepPaged(delta) {
   if (!currentImages.length) return;
   const target = currentPageIndex + delta;
   if (target >= 0 && target < currentImages.length) {
     renderPagedPage(target);
   } else if (target >= currentImages.length && state.readingChapterData?.nextChapterSlug) {
-    navigateTo(
-      `#read/${encodeURIComponent(state.readingComicSlug)}/${encodeURIComponent(
-        state.readingChapterData.nextChapterSlug
-      )}`
-    );
+    goToChapter(state.readingComicSlug, state.readingChapterData.nextChapterSlug);
   } else if (target < 0 && state.readingChapterData?.prevChapterSlug) {
-    navigateTo(
-      `#read/${encodeURIComponent(state.readingComicSlug)}/${encodeURIComponent(
-        state.readingChapterData.prevChapterSlug
-      )}`
-    );
+    goToChapter(state.readingComicSlug, state.readingChapterData.prevChapterSlug);
   }
 }
 
@@ -519,11 +527,24 @@ function jumpToWebtoonPage(pageIdx) {
   const target = container?.querySelector(`.reader-page-wrapper[data-index="${pageIdx}"]`);
   if (target) {
     target.scrollIntoView({ behavior: 'instant', block: 'start' });
-    updatePageCounterUI(pageIdx);
+    updatePageIndex(pageIdx);
   }
 }
 
 // ==================== Smooth deltaTime Auto-Scroll ====================
+
+function updateAutoScrollBtnUI(active) {
+  const hudBtn = document.getElementById('btn-hud-autoscroll');
+  if (hudBtn) {
+    hudBtn.classList.toggle('active', active);
+    const iconSlot = hudBtn.querySelector('.hud-autoscroll-icon');
+    const textSlot = hudBtn.querySelector('.hud-label-hide-sm');
+    if (iconSlot) iconSlot.innerHTML = active ? ICONS.pause(15) : ICONS.play(15);
+    if (textSlot) textSlot.textContent = active ? 'Dừng' : 'Tự cuộn';
+  }
+  const toggleBtn = document.getElementById('setting-autoscroll-toggle');
+  if (toggleBtn) toggleBtn.textContent = active ? 'Dừng' : 'Bật';
+}
 
 export function stopAutoScroll() {
   isAutoScrolling = false;
@@ -533,9 +554,7 @@ export function stopAutoScroll() {
   }
   autoScrollLastTs = 0;
   autoScrollAcc = 0;
-  document.getElementById('btn-hud-autoscroll')?.classList.remove('active');
-  const toggleBtn = document.getElementById('setting-autoscroll-toggle');
-  if (toggleBtn) toggleBtn.textContent = 'Bật';
+  updateAutoScrollBtnUI(false);
 }
 
 export function startAutoScroll() {
@@ -546,10 +565,8 @@ export function startAutoScroll() {
   isAutoScrolling = true;
   autoScrollLastTs = 0;
   autoScrollAcc = 0;
-  document.getElementById('btn-hud-autoscroll')?.classList.add('active');
-  const toggleBtn = document.getElementById('setting-autoscroll-toggle');
-  if (toggleBtn) toggleBtn.textContent = 'Dừng';
-  showToast('Đang tự cuộn (Nhấn Space hoặc kéo tay để dừng)');
+  updateAutoScrollBtnUI(true);
+  if (hudVisible) setHudVisible(false);
 
   function tick(ts) {
     if (!isAutoScrolling) return;
@@ -595,17 +612,13 @@ function bindChapterNavButtons(slug, prevSlug, nextSlug) {
   prevBtns.forEach((btn) => {
     if (!btn) return;
     btn.disabled = !prevSlug;
-    btn.onclick = prevSlug
-      ? () => navigateTo(`#read/${encodeURIComponent(slug)}/${encodeURIComponent(prevSlug)}`)
-      : null;
+    btn.onclick = prevSlug ? () => goToChapter(slug, prevSlug) : null;
   });
 
   nextBtns.forEach((btn) => {
     if (!btn) return;
     btn.disabled = !nextSlug;
-    btn.onclick = nextSlug
-      ? () => navigateTo(`#read/${encodeURIComponent(slug)}/${encodeURIComponent(nextSlug)}`)
-      : null;
+    btn.onclick = nextSlug ? () => goToChapter(slug, nextSlug) : null;
   });
 }
 
@@ -668,18 +681,25 @@ function renderDrawerChapters(slug, currentChapterSlug, filterText = '') {
 
 function updateReaderFavIcon(slug) {
   const fav = isBookmarked(slug);
-  const icon = document.getElementById('reader-fav-icon');
-  if (icon) {
-    icon.setAttribute('fill', fav ? 'currentColor' : 'none');
-    icon.style.color = fav ? 'var(--accent-primary)' : 'currentColor';
+  const btn = document.getElementById('btn-reader-fav');
+  if (btn) {
+    btn.innerHTML = ICONS.heart(fav, 18);
+    btn.style.color = fav ? 'var(--accent-primary)' : '';
   }
 }
 
 // ==================== Main Reader Loader ====================
 
 export async function loadReaderView(slug, chapterSlug, ctx) {
+  // Save previous chapter progress before switching chapter inside Reader
+  if (state.currentView === 'reader' && state.readingComicSlug) {
+    persistCurrentProgress();
+  }
+
   stopAutoScroll();
   applyReaderSettings();
+  lastScrollY = 0;
+  downwardScrollAcc = 0;
   setHudVisible(true);
 
   state.readingComicSlug = slug;
@@ -690,7 +710,7 @@ export async function loadReaderView(slug, chapterSlug, ctx) {
   activeLoadToken++;
   const myToken = activeLoadToken;
 
-  switchView('reader');
+  switchView('reader', `read/${slug}/${chapterSlug}`);
   window.scrollTo({ top: 0, behavior: 'instant' });
 
   const loadingEl = document.getElementById('reader-loading');
@@ -721,8 +741,8 @@ export async function loadReaderView(slug, chapterSlug, ctx) {
         webtoonEl.classList.remove('hidden');
         webtoonEl.innerHTML = `
           <div style="padding: 40px 20px; text-align: center; color: #ff5277;">
-            <p style="margin-bottom: 12px;">Không thể tải hình ảnh chương truyện lúc này!</p>
-            <button class="btn btn-primary" id="btn-retry-chapter">↻ Thử Lại</button>
+            <p style="margin-bottom: 12px;">Không thể tải hình ảnh chương truyện lúc này.</p>
+            <button class="btn btn-primary" id="btn-retry-chapter">${ICONS.refresh(15)}<span>Thử lại</span></button>
           </div>
         `;
         document.getElementById('btn-retry-chapter').onclick = () =>
@@ -741,7 +761,6 @@ export async function loadReaderView(slug, chapterSlug, ctx) {
     bindChapterNavButtons(slug, data.prevChapterSlug, data.nextChapterSlug);
     endNavEl?.classList.remove('hidden');
 
-    // Check saved reading progress for THIS exact chapter
     const saved = getReadingProgress(slug);
     const resumePage =
       saved && saved.chapterSlug === chapterSlug && saved.pageIndex > 0 && saved.pageIndex < currentImages.length
@@ -749,21 +768,21 @@ export async function loadReaderView(slug, chapterSlug, ctx) {
         : 0;
 
     if (state.readerSettings.mode === 'paged') {
-      webtoonEl.innerHTML = '';
+      if (webtoonEl) webtoonEl.innerHTML = '';
       applyReadModeLayout(resumePage);
     } else {
       renderWebtoonPages(currentImages, myToken);
       applyReadModeLayout(resumePage);
     }
 
-    updatePageCounterUI(resumePage);
+    updatePageIndex(resumePage);
+    syncHudPageDisplay();
     if (resumePage > 0) {
-      showToast(`📖 Tiếp tục từ Trang ${resumePage + 1}`);
+      showToast(`Tiếp tục từ trang ${resumePage + 1}`);
     }
 
     markChapterAsRead(slug, chapterSlug);
 
-    // Fix cover lookup bug: ONLY use state.currentComic.cover if it matches this slug!
     const foundCover =
       (state.currentComic?.slug === slug ? state.currentComic.cover : '') ||
       state.loadedComics.find((c) => c.slug === slug)?.cover ||
@@ -780,7 +799,6 @@ export async function loadReaderView(slug, chapterSlug, ctx) {
       time: new Date().toLocaleString('vi-VN')
     });
 
-    // Populate Drawer chapters or fetch detail in background if missing
     if (state.currentComic?.slug === slug && state.chaptersList?.length > 0) {
       const idx = state.chaptersList.findIndex((c) => c.chapterSlug === chapterSlug);
       drawerChunkIndex = idx >= 0 ? Math.floor(idx / DRAWER_CHUNK_SIZE) : 0;
@@ -791,6 +809,8 @@ export async function loadReaderView(slug, chapterSlug, ctx) {
           if (ctx.isStale() || !detail?.chapters?.length) return;
           state.currentComic = detail;
           state.chaptersList = detail.chapters;
+          syncSingleBookmarkFromComic(detail);
+
           const idx = state.chaptersList.findIndex((c) => c.chapterSlug === chapterSlug);
           drawerChunkIndex = idx >= 0 ? Math.floor(idx / DRAWER_CHUNK_SIZE) : 0;
           renderDrawerChapters(slug, chapterSlug, '');
@@ -831,11 +851,14 @@ export function cleanupReader() {
 export function initReaderInteractions() {
   applyReaderSettings();
 
-  // Passive RAF-throttled scroll handler (no layout reflow!)
+  window.addEventListener('resize', scheduleMeasureHeight, { passive: true });
+
+  // Zero-reflow passive scroll handler with downward threshold & idle-only storage saves
   window.addEventListener(
     'scroll',
     () => {
       if (state.currentView !== 'reader') return;
+      scheduleIdleProgressSave();
       if (scrollRafPending) return;
       scrollRafPending = true;
 
@@ -845,10 +868,17 @@ export function initReaderInteractions() {
 
         if (state.readerSettings.mode !== 'paged') {
           const y = window.scrollY;
-          if (y > lastScrollY && y > 140 && hudVisible) {
-            setHudVisible(false);
-          } else if (y < 60 && !hudVisible) {
-            setHudVisible(true);
+          const dy = y - lastScrollY;
+          if (dy > 0) {
+            downwardScrollAcc += dy;
+            if (y > 90 && downwardScrollAcc > 80 && hudVisible) {
+              setHudVisible(false);
+            }
+          } else if (dy < 0) {
+            downwardScrollAcc = 0;
+            if (y <= 8 && !hudVisible) {
+              setHudVisible(true);
+            }
           }
           lastScrollY = y;
         }
@@ -857,7 +887,7 @@ export function initReaderInteractions() {
     { passive: true }
   );
 
-  // Pause auto-scroll when user manually scrolls via wheel or touch
+  // Pause auto-scroll when user manually scrolls
   window.addEventListener(
     'wheel',
     () => {
@@ -873,15 +903,61 @@ export function initReaderInteractions() {
     { passive: true }
   );
 
-  // Save reading progress before tab close / refresh
   window.addEventListener('pagehide', persistCurrentProgress);
-
-  // Tap Webtoon canvas to toggle HUD
-  const webtoonContainer = document.getElementById('reader-images-container');
-  webtoonContainer?.addEventListener('click', (e) => {
-    if (e.target.closest('button, a, .reader-page-error')) return;
-    toggleHud();
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden && state.currentView === 'reader') {
+      persistCurrentProgress();
+    }
   });
+
+  // Clean Tap vs Scroll/Drag recognizer on Webtoon canvas (prevents accidental HUD triggers during drag)
+  const webtoonContainer = document.getElementById('reader-images-container');
+  if (webtoonContainer) {
+    let tapStartX = 0;
+    let tapStartY = 0;
+    let tapStartTs = 0;
+    let tapCandidate = false;
+
+    webtoonContainer.addEventListener('pointerdown', (e) => {
+      if (!e.isPrimary || (e.pointerType === 'mouse' && e.button !== 0)) {
+        tapCandidate = false;
+        return;
+      }
+      if (e.target.closest('button, a, input, .reader-page-error, .page-num-badge')) {
+        tapCandidate = false;
+        return;
+      }
+      tapCandidate = true;
+      tapStartX = e.clientX;
+      tapStartY = e.clientY;
+      tapStartTs = performance.now();
+    });
+
+    webtoonContainer.addEventListener('pointermove', (e) => {
+      if (!tapCandidate) return;
+      if (Math.hypot(e.clientX - tapStartX, e.clientY - tapStartY) > 8) {
+        tapCandidate = false;
+      }
+    });
+
+    webtoonContainer.addEventListener('pointercancel', () => {
+      tapCandidate = false;
+    });
+
+    webtoonContainer.addEventListener('pointerup', (e) => {
+      if (!tapCandidate) return;
+      tapCandidate = false;
+      const dist = Math.hypot(e.clientX - tapStartX, e.clientY - tapStartY);
+      const elapsed = performance.now() - tapStartTs;
+      if (dist < 8 && elapsed < 280) {
+        if (isAutoScrolling) {
+          stopAutoScroll();
+          return;
+        }
+        toggleHud();
+      }
+    });
+  }
 
   // Paged 3-zone tap & swipe gestures
   const tapLeft = document.getElementById('paged-tap-left');
@@ -943,13 +1019,10 @@ export function initReaderInteractions() {
     }
   });
 
-  // Back & Fav & Fullscreen
+  // Back button (uses zero-loop hierarchical stack)
   document.getElementById('btn-reader-back')?.addEventListener('click', () => {
-    if (state.readingComicSlug) {
-      navigateTo(`#comic/${encodeURIComponent(state.readingComicSlug)}`);
-    } else {
-      navigateTo('#home');
-    }
+    persistCurrentProgress();
+    goBackFromReader(state.readingComicSlug);
   });
 
   document.getElementById('btn-reader-fav')?.addEventListener('click', () => {
@@ -963,7 +1036,7 @@ export function initReaderInteractions() {
       };
     const res = toggleFavorite(comicObj);
     updateReaderFavIcon(slug);
-    showToast(res.added ? `❤️ Đã theo dõi "${comicObj.title}"` : `Đã bỏ theo dõi "${comicObj.title}"`);
+    showToast(res.added ? `Đã theo dõi "${comicObj.title}"` : `Đã bỏ theo dõi "${comicObj.title}"`);
   });
 
   document.getElementById('btn-fullscreen')?.addEventListener('click', () => {
@@ -1074,9 +1147,7 @@ export function initReaderInteractions() {
     const item = e.target.closest('.drawer-item');
     if (!item?.dataset.chap) return;
     drawerOverlay?.classList.add('hidden');
-    navigateTo(
-      `#read/${encodeURIComponent(state.readingComicSlug)}/${encodeURIComponent(item.dataset.chap)}`
-    );
+    goToChapter(state.readingComicSlug, item.dataset.chap);
   });
 }
 
@@ -1114,11 +1185,7 @@ export function handleReaderKeydown(e) {
     if (state.readerSettings.mode === 'paged') {
       stepPaged(state.readerSettings.direction === 'rtl' ? 1 : -1);
     } else if (state.readingChapterData?.prevChapterSlug) {
-      navigateTo(
-        `#read/${encodeURIComponent(state.readingComicSlug)}/${encodeURIComponent(
-          state.readingChapterData.prevChapterSlug
-        )}`
-      );
+      goToChapter(state.readingComicSlug, state.readingChapterData.prevChapterSlug);
     }
     return;
   }
@@ -1127,11 +1194,7 @@ export function handleReaderKeydown(e) {
     if (state.readerSettings.mode === 'paged') {
       stepPaged(state.readerSettings.direction === 'rtl' ? -1 : 1);
     } else if (state.readingChapterData?.nextChapterSlug) {
-      navigateTo(
-        `#read/${encodeURIComponent(state.readingComicSlug)}/${encodeURIComponent(
-          state.readingChapterData.nextChapterSlug
-        )}`
-      );
+      goToChapter(state.readingComicSlug, state.readingChapterData.nextChapterSlug);
     }
     return;
   }

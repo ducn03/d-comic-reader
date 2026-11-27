@@ -1,47 +1,60 @@
 /**
- * Home, Filter, Genre, Search, Live Suggestions, Pagination & Genres Modal.
+ * Home, Filter, Genre, Search, Live Suggestions, Pagination, Continue Reading Strip & Genres Modal.
+ * Keep-Alive DOM avoids clearing/re-rendering when returning to the active view.
  */
-import { fetchApi, prefetchDetail } from '../api.js';
-import { state, isBookmarked, toggleFavorite, addSearchHistory, getReadingProgress } from '../state.js';
+import { fetchApi, hasCachedApi } from '../api.js';
+import {
+  state,
+  isBookmarked,
+  toggleFavorite,
+  addSearchHistory,
+  getReadingProgress
+} from '../state.js';
 import { escapeHtml, debounce, getProxyImageUrl, FALLBACK_COVER, showToast } from '../utils.js';
+import { ICONS } from '../icons.js';
 import { navigateTo, switchView, restoreViewScroll } from '../router.js';
 
 const FALLBACK_GENRES = [
-  { slug: 'action', name: 'Action', icon: '⚔️' },
-  { slug: 'manhwa', name: 'Manhwa', icon: '🇰🇷' },
-  { slug: 'manhua', name: 'Manhua', icon: '🇨🇳' },
-  { slug: 'manga', name: 'Manga', icon: '🇯🇵' },
-  { slug: 'chuyen-sinh', name: 'Chuyển Sinh', icon: '✨' },
-  { slug: 'xuyen-khong', name: 'Xuyên Không', icon: '🚀' },
-  { slug: 'co-dai', name: 'Cổ Đại', icon: '🏯' },
-  { slug: 'ngon-tinh', name: 'Ngôn Tình', icon: '💕' },
-  { slug: 'romance', name: 'Romance', icon: '💖' },
-  { slug: 'comedy', name: 'Comedy', icon: '😂' },
-  { slug: 'adventure', name: 'Adventure', icon: '🧭' },
-  { slug: 'fantasy', name: 'Fantasy', icon: '🧙' },
-  { slug: 'shounen', name: 'Shounen', icon: '⚡' },
-  { slug: 'truyen-mau', name: 'Truyện Màu', icon: '🎨' },
-  { slug: 'webtoon', name: 'Webtoon', icon: '📱' },
-  { slug: 'martial-arts', name: 'Võ Thuật', icon: '🥋' },
-  { slug: 'huyen-huyen', name: 'Huyền Huyễn', icon: '🐉' },
-  { slug: 'isekai', name: 'Isekai', icon: '🌌' },
-  { slug: 'trong-sinh', name: 'Trọng Sinh', icon: '🔄' },
-  { slug: 'mystery', name: 'Mystery', icon: '🔍' },
-  { slug: 'supernatural', name: 'Supernatural', icon: '🔮' },
-  { slug: 'sports', name: 'Sports', icon: '⚽' },
-  { slug: 'slice-of-life', name: 'Slice of Life', icon: '☕' },
-  { slug: 'school-life', name: 'School Life', icon: '🏫' },
-  { slug: 'sci-fi', name: 'Sci-fi', icon: '🛸' },
-  { slug: 'seinen', name: 'Seinen', icon: '🍷' },
-  { slug: 'psychological', name: 'Psychological', icon: '🧠' },
-  { slug: 'harem', name: 'Harem', icon: '🌸' },
-  { slug: 'drama', name: 'Drama', icon: '🎭' },
-  { slug: 'historical', name: 'Historical', icon: '📜' },
-  { slug: 'horror', name: 'Horror', icon: '👻' },
-  { slug: 'magic', name: 'Magic', icon: '🪄' }
+  { slug: 'action', name: 'Action' },
+  { slug: 'manhwa', name: 'Manhwa' },
+  { slug: 'manhua', name: 'Manhua' },
+  { slug: 'manga', name: 'Manga' },
+  { slug: 'chuyen-sinh', name: 'Chuyển Sinh' },
+  { slug: 'xuyen-khong', name: 'Xuyên Không' },
+  { slug: 'co-dai', name: 'Cổ Đại' },
+  { slug: 'ngon-tinh', name: 'Ngôn Tình' },
+  { slug: 'romance', name: 'Romance' },
+  { slug: 'comedy', name: 'Comedy' },
+  { slug: 'adventure', name: 'Adventure' },
+  { slug: 'fantasy', name: 'Fantasy' },
+  { slug: 'shounen', name: 'Shounen' },
+  { slug: 'truyen-mau', name: 'Truyện Màu' },
+  { slug: 'webtoon', name: 'Webtoon' },
+  { slug: 'martial-arts', name: 'Võ Thuật' },
+  { slug: 'huyen-huyen', name: 'Huyền Huyễn' },
+  { slug: 'isekai', name: 'Isekai' },
+  { slug: 'trong-sinh', name: 'Trọng Sinh' },
+  { slug: 'mystery', name: 'Mystery' },
+  { slug: 'supernatural', name: 'Supernatural' },
+  { slug: 'sports', name: 'Sports' },
+  { slug: 'slice-of-life', name: 'Slice of Life' },
+  { slug: 'school-life', name: 'School Life' },
+  { slug: 'sci-fi', name: 'Sci-fi' },
+  { slug: 'seinen', name: 'Seinen' },
+  { slug: 'psychological', name: 'Psychological' },
+  { slug: 'harem', name: 'Harem' },
+  { slug: 'drama', name: 'Drama' },
+  { slug: 'historical', name: 'Historical' },
+  { slug: 'horror', name: 'Horror' },
+  { slug: 'magic', name: 'Magic' }
 ];
 
 let genresCatalog = FALLBACK_GENRES;
+
+// Keep-Alive render cache for Home/Explore view
+let currentRenderedKey = '';
+let currentRenderedAt = 0;
+let suppressNextScrollRestore = false;
 
 /**
  * Shared Comic Grid Renderer using DocumentFragment + Event Delegation.
@@ -50,7 +63,6 @@ export function renderComicsGrid(comics, container, options = {}) {
   if (!container) return;
   container.innerHTML = '';
 
-  // Store lookup map on container for event delegation
   const comicMap = new Map();
   container._comicMap = comicMap;
   container._gridOptions = options;
@@ -58,7 +70,7 @@ export function renderComicsGrid(comics, container, options = {}) {
   if (!comics || comics.length === 0) {
     container.innerHTML = `
       <div style="grid-column: 1 / -1; text-align: center; padding: 56px 20px; color: var(--text-dim);">
-        <p style="font-size: 15px;">${escapeHtml(options.emptyText || 'Không tìm thấy bộ truyện nào!')}</p>
+        <p style="font-size: 14.5px;">${escapeHtml(options.emptyText || 'Không tìm thấy bộ truyện nào.')}</p>
       </div>
     `;
     return;
@@ -97,7 +109,7 @@ export function renderComicsGrid(comics, container, options = {}) {
         return `
           <div class="comic-chapter-link" data-slug="${escapeHtml(comic.slug)}" data-chap="${chapSlug}">
             <span>${chapTitle}</span>
-            <span class="c-time">${chapTime}</span>
+            ${chapTime ? `<span class="c-time">${chapTime}</span>` : ''}
           </div>
         `;
       })
@@ -112,10 +124,8 @@ export function renderComicsGrid(comics, container, options = {}) {
         <img class="comic-thumb" src="${getProxyImageUrl(comic.cover)}" alt="${titleSafe}" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='${FALLBACK_COVER}'">
         <div class="comic-overlay-badges">
           <div class="badge-group-left">${newBadge}${viewBadge}</div>
-          <button class="btn-card-fav ${fav ? 'active' : ''}" data-slug="${escapeHtml(comic.slug)}" title="Yêu thích" aria-label="Theo dõi truyện">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="${fav ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2">
-              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
-            </svg>
+          <button class="btn-card-fav ${fav ? 'active' : ''}" data-slug="${escapeHtml(comic.slug)}" title="Theo dõi" aria-label="Theo dõi truyện">
+            ${ICONS.heart(fav, 16)}
           </button>
         </div>
       </div>
@@ -136,6 +146,17 @@ export function renderComicsGrid(comics, container, options = {}) {
   }
 }
 
+function syncGridBookmarksUI(container) {
+  if (!container) return;
+  container.querySelectorAll('.btn-card-fav').forEach((btn) => {
+    const slug = btn.dataset.slug;
+    const fav = isBookmarked(slug);
+    btn.classList.toggle('active', fav);
+    const pathEl = btn.querySelector('path');
+    if (pathEl) pathEl.setAttribute('fill', fav ? 'currentColor' : 'none');
+  });
+}
+
 function attachGridDelegation(container) {
   container.addEventListener('click', (e) => {
     const favBtn = e.target.closest('.btn-card-fav');
@@ -153,7 +174,7 @@ function attachGridDelegation(container) {
       if (typeof container._gridOptions?.onFavoriteToggled === 'function') {
         container._gridOptions.onFavoriteToggled(comic, res, favBtn.closest('.comic-card'));
       } else {
-        showToast(res.added ? `❤️ Đã theo dõi "${comic.title}"` : `Đã bỏ theo dõi "${comic.title}"`);
+        showToast(res.added ? `Đã theo dõi "${comic.title}"` : `Đã bỏ theo dõi "${comic.title}"`);
       }
       return;
     }
@@ -176,23 +197,51 @@ function attachGridDelegation(container) {
       navigateTo(`#comic/${encodeURIComponent(card.dataset.slug)}`);
     }
   });
+}
 
-  // Gentle desktop hover-intent prefetch (replaces 8-request home storm)
-  let hoverTimer = null;
-  container.addEventListener('pointerover', (e) => {
-    if (e.pointerType !== 'mouse') return;
-    const card = e.target.closest('.comic-card');
-    if (!card || !card.dataset.slug) return;
-    clearTimeout(hoverTimer);
-    const slug = card.dataset.slug;
-    hoverTimer = setTimeout(() => prefetchDetail(slug), 260);
-  });
+function renderContinueReadingStrip(show = true) {
+  const strip = document.getElementById('continue-reading-strip');
+  const listEl = document.getElementById('continue-reading-list');
+  if (!strip || !listEl) return;
 
-  container.addEventListener('pointerout', (e) => {
-    if (e.target.closest('.comic-card')) {
-      clearTimeout(hoverTimer);
-    }
-  });
+  if (!show || !state.history || state.history.length === 0) {
+    strip.classList.add('hidden');
+    return;
+  }
+
+  const recent = state.history.slice(0, 8);
+  listEl.innerHTML = '';
+  const frag = document.createDocumentFragment();
+
+  for (const h of recent) {
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'continue-card';
+    item.dataset.slug = h.slug;
+    item.dataset.chap = h.chapterSlug;
+
+    const prog = getReadingProgress(h.slug);
+    const pageHint =
+      prog && prog.chapterSlug === h.chapterSlug && prog.pageIndex > 0
+        ? ` · Tr.${prog.pageIndex + 1}`
+        : '';
+
+    const coverUrl = h.cover ? getProxyImageUrl(h.cover) : FALLBACK_COVER;
+    const safeTitle = escapeHtml(h.title || h.slug);
+    const safeSub = escapeHtml((h.chapterTitle || h.chapterSlug) + pageHint);
+
+    item.innerHTML = `
+      <img class="continue-thumb" src="${coverUrl}" alt="${safeTitle}" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='${FALLBACK_COVER}'">
+      <div class="continue-meta">
+        <div class="continue-title">${safeTitle}</div>
+        <div class="continue-sub">${safeSub}</div>
+      </div>
+    `;
+    frag.appendChild(item);
+  }
+
+  listEl.appendChild(frag);
+  strip.classList.remove('hidden');
 }
 
 function renderSkeletonGrid(container, count = 12) {
@@ -205,46 +254,6 @@ function renderSkeletonGrid(container, count = 12) {
     frag.appendChild(skel);
   }
   container.appendChild(frag);
-}
-
-function setupFeaturedManga(comic) {
-  const section = document.getElementById('featured-section');
-  if (!section || !comic) return;
-
-  const titleEl = document.getElementById('featured-title');
-  const descEl = document.getElementById('featured-desc');
-  const bgEl = document.getElementById('featured-bg');
-  const coverEl = document.getElementById('featured-cover-img');
-  const timeBadge = document.getElementById('featured-time-badge');
-  const readBtn = document.getElementById('featured-read-btn');
-  const detailBtn = document.getElementById('featured-detail-btn');
-
-  const coverUrl = getProxyImageUrl(comic.cover);
-  const firstChap = comic.chapters?.[0];
-
-  titleEl.textContent = comic.title;
-  descEl.textContent = firstChap
-    ? `Chương mới nhất: ${firstChap.title}${firstChap.time ? ` • ${firstChap.time}` : ''}`
-    : 'Truyện đang được cập nhật liên tục';
-  bgEl.style.backgroundImage = `url(${coverUrl})`;
-  coverEl.src = coverUrl;
-  coverEl.onerror = () => {
-    coverEl.onerror = null;
-    coverEl.src = FALLBACK_COVER;
-  };
-  if (timeBadge) {
-    timeBadge.textContent = firstChap?.time || 'Mới cập nhật';
-  }
-
-  readBtn.onclick = () => {
-    if (firstChap?.chapterSlug) {
-      navigateTo(`#read/${encodeURIComponent(comic.slug)}/${encodeURIComponent(firstChap.chapterSlug)}`);
-    } else {
-      navigateTo(`#comic/${encodeURIComponent(comic.slug)}`);
-    }
-  };
-  detailBtn.onclick = () => navigateTo(`#comic/${encodeURIComponent(comic.slug)}`);
-  section.classList.remove('hidden');
 }
 
 function renderPagination(pagination, onPageChange) {
@@ -344,11 +353,33 @@ export async function loadHomeView({ page = 1, sort = 0, genre = '', status = 0,
     chip.classList.toggle('active', Boolean(match));
   });
 
-  switchView('home');
-
+  const showContinue = page === 1 && !genre && !status && sort === 0;
   const grid = document.getElementById('comics-grid');
-  const featured = document.getElementById('featured-section');
-  renderSkeletonGrid(grid, 12);
+  const renderKey = `home:${hashKey || 'home'}`;
+  const isFreshKeepAlive =
+    currentRenderedKey === renderKey &&
+    grid &&
+    grid.children.length > 0 &&
+    Date.now() - currentRenderedAt < 300000;
+
+  if (isFreshKeepAlive && !suppressNextScrollRestore) {
+    syncGridBookmarksUI(grid);
+    renderContinueReadingStrip(showContinue);
+    switchView('home', hashKey);
+    restoreViewScroll(hashKey, 0);
+    return;
+  }
+
+  switchView('home', hashKey);
+  renderContinueReadingStrip(showContinue);
+
+  const apiCached = genre
+    ? hasCachedApi('genre', { slug: genre, page }, 300000)
+    : hasCachedApi('home', { page, sort, status }, 180000);
+
+  if (!apiCached) {
+    renderSkeletonGrid(grid, 12);
+  }
 
   try {
     const data = genre
@@ -366,32 +397,30 @@ export async function loadHomeView({ page = 1, sort = 0, genre = '', status = 0,
 
     if (genre) {
       const g = genresCatalog.find((item) => item.slug === genre);
-      titleEl.textContent = `${g ? g.icon : '🏷️'} Thể loại: ${g ? g.name : genre}`;
+      titleEl.textContent = `Thể loại: ${g ? g.name : genre}`;
     } else if (status === 2) {
-      titleEl.textContent = '🏆 Truyện Đã Hoàn Thành (Full)';
+      titleEl.textContent = 'Truyện Đã Hoàn Thành';
     } else if (sort === 10 || sort === 1) {
-      titleEl.textContent = '👑 Top Truyện Xem Nhiều Trong Ngày';
+      titleEl.textContent = 'Top Xem Nhiều Trong Ngày';
     } else if (sort === 12) {
-      titleEl.textContent = '⭐ Top Truyện Xem Nhiều Trong Tuần';
+      titleEl.textContent = 'Top Xem Nhiều Trong Tuần';
     } else if (sort === 11) {
-      titleEl.textContent = '📅 Top Truyện Xem Nhiều Trong Tháng';
+      titleEl.textContent = 'Top Xem Nhiều Trong Tháng';
     } else if (sort === 20) {
-      titleEl.textContent = '❤️ Top Truyện Được Yêu Thích';
+      titleEl.textContent = 'Truyện Được Yêu Thích';
     } else {
-      titleEl.textContent = 'Danh Sách Truyện Mới Cập Nhật';
+      titleEl.textContent = 'Mới Cập Nhật';
     }
 
     if (countEl) countEl.textContent = `${comics.length} truyện`;
-    if (sourceEl) sourceEl.textContent = data?.source === 'nettruyen' ? 'NetTruyen Fallback' : 'TruyenQQ Live';
-
-    if (comics.length > 0 && page === 1 && !genre && !status && sort === 0) {
-      setupFeaturedManga(comics[0]);
-    } else if (featured) {
-      featured.classList.add('hidden');
-    }
+    if (sourceEl) sourceEl.textContent = data?.source === 'nettruyen' ? 'NetTruyen' : 'TruyenQQ';
 
     renderComicsGrid(comics, grid);
+    currentRenderedKey = renderKey;
+    currentRenderedAt = Date.now();
+
     renderPagination(data?.pagination, (targetPage) => {
+      suppressNextScrollRestore = true;
       if (genre) {
         navigateTo(`#genre/${encodeURIComponent(genre)}?page=${targetPage}`);
       } else {
@@ -400,18 +429,22 @@ export async function loadHomeView({ page = 1, sort = 0, genre = '', status = 0,
         if (status) params.set('status', String(status));
         navigateTo(`#home?${params.toString()}`);
       }
-      scrollToGridTop();
     });
 
-    restoreViewScroll(hashKey, 0);
+    if (suppressNextScrollRestore) {
+      suppressNextScrollRestore = false;
+      scrollToGridTop();
+    } else {
+      restoreViewScroll(hashKey, 0);
+    }
   } catch (err) {
+    suppressNextScrollRestore = false;
     if (err.name === 'AbortError' || ctx.isStale()) return;
-    if (featured) featured.classList.add('hidden');
 
     if (window.location.protocol === 'file:') {
       grid.innerHTML = `
         <div style="grid-column: 1 / -1; text-align: center; padding: 40px 20px; background: rgba(255,42,85,0.08); border: 1px dashed rgba(255,42,85,0.4); border-radius: 14px;">
-          <h3 style="color: #ff5277; margin-bottom: 8px;">⚠️ Chưa khởi động Server!</h3>
+          <h3 style="color: #ff5277; margin-bottom: 8px;">Chưa khởi động Server</h3>
           <p style="color: #cbd5e1; font-size: 14px;">Hãy nhấp đúp chạy file <code>Mo Web Doc Truyen.bat</code> trong thư mục dự án để mở web.</p>
         </div>
       `;
@@ -429,18 +462,34 @@ export async function loadSearchView(keyword, page = 1, hashKey = '', ctx) {
   const searchInput = document.getElementById('search-input');
   const clearBtn = document.getElementById('search-clear-btn');
   const dropdown = document.getElementById('search-dropdown');
-  const featured = document.getElementById('featured-section');
 
   if (searchInput) searchInput.value = keyword;
   if (clearBtn) clearBtn.classList.toggle('hidden', !keyword);
   if (dropdown) dropdown.classList.add('hidden');
-  if (featured) featured.classList.add('hidden');
+  renderContinueReadingStrip(false);
 
   document.querySelectorAll('.filter-chip').forEach((c) => c.classList.remove('active'));
-  switchView('home');
 
   const grid = document.getElementById('comics-grid');
-  renderSkeletonGrid(grid, 8);
+  const renderKey = `search:${hashKey}`;
+  const isFreshKeepAlive =
+    currentRenderedKey === renderKey &&
+    grid &&
+    grid.children.length > 0 &&
+    Date.now() - currentRenderedAt < 300000;
+
+  if (isFreshKeepAlive && !suppressNextScrollRestore) {
+    syncGridBookmarksUI(grid);
+    switchView('home', hashKey);
+    restoreViewScroll(hashKey, 0);
+    return;
+  }
+
+  switchView('home', hashKey);
+
+  if (!hasCachedApi('search', { q: keyword, page }, 180000)) {
+    renderSkeletonGrid(grid, 8);
+  }
 
   try {
     const data = await fetchApi('search', { q: keyword, page }, { ttlMs: 180000, signal: ctx.signal });
@@ -449,19 +498,28 @@ export async function loadSearchView(keyword, page = 1, hashKey = '', ctx) {
     const comics = data?.comics || [];
     state.loadedComics = comics;
 
-    document.getElementById('home-section-title').textContent = `Kết Quả Tìm Kiếm: "${keyword}"`;
+    document.getElementById('home-section-title').textContent = `Tìm kiếm: "${keyword}"`;
     document.getElementById('comics-count-pill').textContent = `${comics.length} kết quả`;
 
     renderComicsGrid(comics, grid, {
       emptyText: `Không tìm thấy truyện nào khớp với "${keyword}".`
     });
+    currentRenderedKey = renderKey;
+    currentRenderedAt = Date.now();
+
     renderPagination(data?.pagination, (targetPage) => {
+      suppressNextScrollRestore = true;
       navigateTo(`#search/${encodeURIComponent(keyword)}?page=${targetPage}`);
-      scrollToGridTop();
     });
 
-    restoreViewScroll(hashKey, 0);
+    if (suppressNextScrollRestore) {
+      suppressNextScrollRestore = false;
+      scrollToGridTop();
+    } else {
+      restoreViewScroll(hashKey, 0);
+    }
   } catch (err) {
+    suppressNextScrollRestore = false;
     if (err.name === 'AbortError' || ctx.isStale()) return;
     showToast('Lỗi tìm kiếm: ' + err.message);
   }
@@ -482,6 +540,22 @@ export function initHomeInteractions() {
         navigateTo('#home');
       }
     });
+  });
+
+  // Continue Reading strip delegation
+  document.getElementById('continue-reading-list')?.addEventListener('click', (e) => {
+    const card = e.target.closest('.continue-card');
+    if (!card) return;
+    const { slug, chap } = card.dataset;
+    if (slug && chap) {
+      navigateTo(`#read/${encodeURIComponent(slug)}/${encodeURIComponent(chap)}`);
+    } else if (slug) {
+      navigateTo(`#comic/${encodeURIComponent(slug)}`);
+    }
+  });
+
+  document.getElementById('btn-continue-all')?.addEventListener('click', () => {
+    navigateTo('#history');
   });
 
   // Drag-to-scroll horizontal filter strip on desktop
@@ -699,10 +773,7 @@ async function initGenresModal() {
       const item = document.createElement('div');
       item.className = 'genre-card-item';
       item.dataset.slug = g.slug;
-      item.innerHTML = `
-        <span style="font-size: 18px;">${escapeHtml(g.icon || '🏷️')}</span>
-        <span class="genre-card-name">${escapeHtml(g.name)}</span>
-      `;
+      item.innerHTML = `<span class="genre-card-name">${escapeHtml(g.name)}</span>`;
       frag.appendChild(item);
     }
     grid.appendChild(frag);
@@ -739,23 +810,4 @@ async function initGenresModal() {
   backdrop?.addEventListener('click', (e) => {
     if (e.target === backdrop) backdrop.classList.add('hidden');
   });
-}
-
-export async function openRandomComic() {
-  let pool = state.loadedComics;
-  if (!pool || pool.length === 0) {
-    try {
-      const data = await fetchApi('home', { page: 1, sort: 10 }, { ttlMs: 180000 });
-      pool = data?.comics || [];
-    } catch {
-      pool = [];
-    }
-  }
-  if (!pool.length) {
-    showToast('Chưa có danh sách truyện để chọn ngẫu nhiên.');
-    return;
-  }
-  const chosen = pool[Math.floor(Math.random() * pool.length)];
-  showToast(`🎲 Gợi ý ngẫu nhiên: "${chosen.title}"`);
-  navigateTo(`#comic/${encodeURIComponent(chosen.slug)}`);
 }

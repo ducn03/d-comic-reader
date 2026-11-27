@@ -1,11 +1,12 @@
 /**
- * Shared Frontend Utilities: XSS-safe escaping, debounce, image URL builder, time parsing, toasts.
+ * Shared Frontend Utilities: XSS-safe escaping, debounce, image URL builder,
+ * precision-aware Vietnamese time parsing & formatting, toasts, and spinner.
  */
 
 export const FALLBACK_COVER = 'assets/cover-fallback.svg';
 
 const API_BASE =
-  window.location.protocol === 'file:'
+  typeof window !== 'undefined' && window.location?.protocol === 'file:'
     ? 'http://localhost:3000/api/manga'
     : '/api/manga';
 
@@ -48,49 +49,127 @@ export function getProxyImageUrl(rawUrl) {
   return `${API_BASE}?endpoint=image&url=${encodeURIComponent(rawUrl)}`;
 }
 
-export function parseVietnameseTime(timeStr) {
-  if (!timeStr) return 0;
-  const s = String(timeStr).toLowerCase().trim();
-  const now = Date.now();
+function localMidnight(ms) {
+  const d = new Date(ms);
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+}
 
-  if (s.includes('vừa') || s.includes('mới')) return now;
+export function isSameLocalDay(tsA, tsB) {
+  if (!tsA || !tsB) return false;
+  const a = new Date(tsA);
+  const b = new Date(tsB);
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+/**
+ * Parses Vietnamese relative/date chapter timestamps and returns { ts, precision }:
+ * - 'exact': second/minute/hour precision (from Home/Genre feeds)
+ * - 'day': day-level precision (from dd/mm/yyyy or day/week/month strings)
+ * - 'none': unparseable or missing
+ */
+export function parseVietnameseTimeWithPrecision(timeStr, nowMs = Date.now()) {
+  if (!timeStr) return { ts: 0, precision: 'none' };
+  const s = String(timeStr).toLowerCase().trim();
+  if (!s) return { ts: 0, precision: 'none' };
+
+  if (s.includes('vừa') || s.includes('mới')) {
+    return { ts: nowMs, precision: 'exact' };
+  }
 
   let m = s.match(/(\d+)\s*giây/);
-  if (m) return now - parseInt(m[1], 10) * 1000;
+  if (m) return { ts: nowMs - parseInt(m[1], 10) * 1000, precision: 'exact' };
 
   m = s.match(/(\d+)\s*phút/);
-  if (m) return now - parseInt(m[1], 10) * 60 * 1000;
+  if (m) return { ts: nowMs - parseInt(m[1], 10) * 60000, precision: 'exact' };
 
   m = s.match(/(\d+)\s*(?:giờ|tiếng)/);
-  if (m) return now - parseInt(m[1], 10) * 3600 * 1000;
+  if (m) return { ts: nowMs - parseInt(m[1], 10) * 3600000, precision: 'exact' };
 
-  if (s.includes('hôm qua')) return now - 24 * 3600 * 1000;
-  if (s.includes('hôm kia')) return now - 48 * 3600 * 1000;
+  if (s.includes('hôm nay')) {
+    return { ts: localMidnight(nowMs), precision: 'day' };
+  }
+  if (s.includes('hôm qua')) {
+    return { ts: localMidnight(nowMs - 86400000), precision: 'day' };
+  }
+  if (s.includes('hôm kia')) {
+    return { ts: localMidnight(nowMs - 2 * 86400000), precision: 'day' };
+  }
 
   m = s.match(/(\d+)\s*ngày/);
-  if (m) return now - parseInt(m[1], 10) * 24 * 3600 * 1000;
+  if (m) {
+    return { ts: localMidnight(nowMs - parseInt(m[1], 10) * 86400000), precision: 'day' };
+  }
 
   m = s.match(/(\d+)\s*tuần/);
-  if (m) return now - parseInt(m[1], 10) * 7 * 24 * 3600 * 1000;
+  if (m) {
+    return { ts: localMidnight(nowMs - parseInt(m[1], 10) * 7 * 86400000), precision: 'day' };
+  }
 
   m = s.match(/(\d+)\s*tháng/);
-  if (m) return now - parseInt(m[1], 10) * 30 * 24 * 3600 * 1000;
+  if (m) {
+    return { ts: localMidnight(nowMs - parseInt(m[1], 10) * 30 * 86400000), precision: 'day' };
+  }
 
   m = s.match(/(\d+)\s*năm/);
-  if (m) return now - parseInt(m[1], 10) * 365 * 24 * 3600 * 1000;
+  if (m) {
+    return { ts: localMidnight(nowMs - parseInt(m[1], 10) * 365 * 86400000), precision: 'day' };
+  }
 
+  // ISO YYYY-MM-DD
+  m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m) {
+    const d = new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10));
+    const ts = d.getTime();
+    return Number.isNaN(ts) ? { ts: 0, precision: 'none' } : { ts, precision: 'day' };
+  }
+
+  // dd/mm/yyyy or dd-mm-yyyy
   m = s.match(/(\d{1,2})[/-](\d{1,2})[/-](\d{4})/);
   if (m) {
     const d = new Date(parseInt(m[3], 10), parseInt(m[2], 10) - 1, parseInt(m[1], 10));
-    return d.getTime() || 0;
+    const ts = d.getTime();
+    return Number.isNaN(ts) ? { ts: 0, precision: 'none' } : { ts, precision: 'day' };
   }
 
   const parsed = Date.parse(timeStr);
-  return Number.isNaN(parsed) ? 0 : parsed;
+  return Number.isNaN(parsed)
+    ? { ts: 0, precision: 'none' }
+    : { ts: parsed, precision: 'day' };
+}
+
+export function parseVietnameseTime(timeStr, nowMs = Date.now()) {
+  return parseVietnameseTimeWithPrecision(timeStr, nowMs).ts;
+}
+
+/**
+ * Formats a stored epoch timestamp dynamically so relative labels naturally age over time.
+ */
+export function formatChapterTimeLabel(chapterUpdatedAt, precision = 'day', fallbackRaw = '', nowMs = Date.now()) {
+  const ts = Number(chapterUpdatedAt) || 0;
+  if (ts <= 0) return fallbackRaw || 'Chưa rõ';
+
+  const diff = Math.max(0, nowMs - ts);
+  if (precision === 'exact' && diff < 86400000) {
+    if (diff < 60000) return 'Vừa xong';
+    if (diff < 3600000) return `${Math.floor(diff / 60000)} phút trước`;
+    return `${Math.floor(diff / 3600000)} giờ trước`;
+  }
+
+  if (isSameLocalDay(ts, nowMs)) return 'Hôm nay';
+  if (isSameLocalDay(ts, nowMs - 86400000)) return 'Hôm qua';
+
+  const d = new Date(ts);
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  return `${dd}/${mm}/${d.getFullYear()}`;
 }
 
 export function showToast(message, options = {}) {
-  const { duration = 3000, actionText = '', onAction = null } =
+  const { duration = 2800, actionText = '', onAction = null } =
     typeof options === 'number' ? { duration: options } : options;
 
   const container = document.getElementById('toast-container');
@@ -118,7 +197,7 @@ export function showToast(message, options = {}) {
 
   setTimeout(() => {
     toast.style.opacity = '0';
-    setTimeout(() => toast.remove(), 260);
+    setTimeout(() => toast.remove(), 240);
   }, duration);
 }
 

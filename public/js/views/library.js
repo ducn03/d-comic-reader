@@ -1,10 +1,16 @@
 /**
- * Library Views: Bookmarks (with "MỚI" badge, Undo remove, gentle sync, backup/restore) & History.
+ * Library Views:
+ * - Bookmarks with accurate release-time sorting, 2-tier full sync, unread filter chip, and overflow menu
+ * - Keep-Alive DOM signatures so returning to Bookmarks / History preserves state without flicker
  */
 import { fetchApi } from '../api.js';
 import {
   state,
   compactBookmark,
+  mergeBookmarkChapterInfo,
+  compareBookmarksUpdated,
+  hasBookmarkUnreadChapter,
+  getBookmarkDisplayTime,
   saveBookmarks,
   restoreFavorite,
   clearAllBookmarks,
@@ -17,25 +23,25 @@ import {
   escapeHtml,
   debounce,
   getProxyImageUrl,
-  parseVietnameseTime,
   FALLBACK_COVER,
   showToast
 } from '../utils.js';
+import { ICONS } from '../icons.js';
 import { navigateTo, switchView, restoreViewScroll } from '../router.js';
 import { renderComicsGrid } from './home.js';
 
 let syncAbort = null;
-let lastSyncTime = 0;
+let lastFullSyncTime = 0;
+let lastHomeSyncTime = 0;
+const sessionSyncedSlugs = new Set();
 
-function getBookmarkSortTime(comic) {
-  if (comic.updatedAt && Number(comic.updatedAt) > 0) {
-    return Number(comic.updatedAt);
-  }
-  if (comic.latestTime) {
-    const t = parseVietnameseTime(comic.latestTime);
-    if (t > 0) return t;
-  }
-  return Number(comic.bookmarkedAt || 0);
+function updateUnreadFilterButtonUI() {
+  const unreadBtn = document.getElementById('btn-filter-unread');
+  if (!unreadBtn) return;
+
+  const unreadCount = state.bookmarks.filter((bm) => hasBookmarkUnreadChapter(bm)).length;
+  unreadBtn.classList.toggle('active', Boolean(state.bookmarkUnreadOnly));
+  unreadBtn.textContent = unreadCount > 0 ? `Có chap mới (${unreadCount})` : 'Có chap mới';
 }
 
 function getSortedFilteredBookmarks() {
@@ -48,15 +54,24 @@ function getSortedFilteredBookmarks() {
     list = list.filter((b) => (b.title || '').toLowerCase().includes(filterText));
   }
 
+  if (state.bookmarkUnreadOnly) {
+    list = list.filter((bm) => hasBookmarkUnreadChapter(bm));
+  }
+
   const sortType = state.bookmarkSort || 'updated';
   if (sortType === 'az') {
     list.sort((a, b) => (a.title || '').localeCompare(b.title || '', 'vi'));
   } else if (sortType === 'added') {
-    list.sort((a, b) => (b.bookmarkedAt || 0) - (a.bookmarkedAt || 0));
+    list.sort((a, b) => (Number(b.bookmarkedAt) || 0) - (Number(a.bookmarkedAt) || 0));
   } else {
-    list.sort((a, b) => getBookmarkSortTime(b) - getBookmarkSortTime(a));
+    list.sort((a, b) => compareBookmarksUpdated(a, b));
   }
-  return list;
+
+  // Enrich chapter time label dynamically for display in grid
+  return list.map((bm) => ({
+    ...bm,
+    latestTime: bm.latestChapter ? getBookmarkDisplayTime(bm) : ''
+  }));
 }
 
 export function renderBookmarksList() {
@@ -64,19 +79,25 @@ export function renderBookmarksList() {
   const pill = document.getElementById('bookmarks-count-pill');
   const sortSelect = document.getElementById('select-bookmark-sort');
 
-  if (pill) pill.textContent = `${state.bookmarks.length} bộ truyện`;
+  if (pill) pill.textContent = `${state.bookmarks.length} truyện`;
   if (sortSelect) sortSelect.value = state.bookmarkSort || 'updated';
+  updateUnreadFilterButtonUI();
 
   const items = getSortedFilteredBookmarks();
+  const emptyText = !state.bookmarks.length
+    ? 'Bạn chưa theo dõi bộ truyện nào.'
+    : state.bookmarkUnreadOnly
+      ? 'Không có truyện nào có chương mới chưa đọc.'
+      : 'Không có truyện theo dõi nào khớp từ khóa lọc.';
+
   renderComicsGrid(items, grid, {
     markUnreadNew: true,
-    emptyText: state.bookmarks.length
-      ? 'Không có truyện yêu thích nào khớp từ khóa lọc.'
-      : 'Bạn chưa theo dõi bộ truyện nào!',
+    emptyText,
     onFavoriteToggled: (comic, res, cardEl) => {
       if (!res.added && cardEl) {
         cardEl.remove();
-        if (pill) pill.textContent = `${state.bookmarks.length} bộ truyện`;
+        if (pill) pill.textContent = `${state.bookmarks.length} truyện`;
+        updateUnreadFilterButtonUI();
         showToast(`Đã bỏ theo dõi "${comic.title}"`, {
           duration: 4500,
           actionText: 'Hoàn tác',
@@ -95,81 +116,168 @@ export function loadBookmarksView(hashKey) {
   renderBookmarksList();
   restoreViewScroll(hashKey, 0);
 
-  // Gentle auto-sync at most once every 15 minutes
-  if (state.bookmarks.length > 0 && Date.now() - lastSyncTime > 900000) {
-    syncBookmarksUpdates(false);
+  if (state.bookmarks.length > 0) {
+    const hasUnsynced = state.bookmarks.some(
+      (b) => (!b.chapterUpdatedAt || b.chapterUpdatedAt <= 0) && !sessionSyncedSlugs.has(b.slug)
+    );
+    const fullDue = Date.now() - lastFullSyncTime > 900000;
+    if (fullDue || hasUnsynced) {
+      syncBookmarksUpdates(false);
+    }
   }
 }
 
+function setSyncBtnState(busy, labelText = 'Cập nhật') {
+  const btn = document.getElementById('btn-sync-bookmarks');
+  if (!btn) return;
+  btn.disabled = busy;
+  btn.innerHTML = `<span class="btn-svg-icon${busy ? ' is-spinning' : ''}">${ICONS.refresh(15)}</span><span>${escapeHtml(labelText)}</span>`;
+}
+
+/**
+ * 2-Tier Bookmark Sync:
+ * Tier 1: Matches Home pages 1..2 (~84 newest releases) to capture minute-accurate timestamps.
+ * Tier 2: Checks ALL remaining followed comics (no 15-item limit) in batches of 3, preserving same-day exact times.
+ */
 export async function syncBookmarksUpdates(force = false) {
   if (syncAbort || !state.bookmarks.length) return;
   const now = Date.now();
-  if (!force && now - lastSyncTime < 900000) return;
+  const unsyncedOnly =
+    !force && now - lastFullSyncTime <= 900000
+      ? state.bookmarks.filter(
+          (b) => (!b.chapterUpdatedAt || b.chapterUpdatedAt <= 0) && !sessionSyncedSlugs.has(b.slug)
+        )
+      : null;
 
-  lastSyncTime = now;
+  if (unsyncedOnly && unsyncedOnly.length === 0) return;
+
   syncAbort = new AbortController();
-  const btn = document.getElementById('btn-sync-bookmarks');
-  const targets = state.bookmarks.slice(0, 15);
-  let checked = 0;
-  let updatedCount = 0;
+  const { signal } = syncAbort;
+  const allTargets = unsyncedOnly || [...state.bookmarks];
 
-  if (btn) {
-    btn.disabled = true;
-    btn.textContent = `🔄 Đang kiểm tra 0/${targets.length}...`;
-  }
+  let checked = 0;
+  let newChapterCount = 0;
+  let changedCount = 0;
+  const totalCount = allTargets.length;
+
+  setSyncBtnState(true, `0/${totalCount}`);
 
   try {
-    // Low concurrency (2) to never choke backend or trigger origin rate limits
-    for (let i = 0; i < targets.length; i += 2) {
-      if (syncAbort.signal.aborted) break;
-      const batch = targets.slice(i, i + 2);
+    // Tier 1: Fetch Home page 1..2 when doing full sync OR home cache stale
+    const homeMap = new Map();
+    if (!unsyncedOnly || force || now - lastHomeSyncTime > 300000) {
+      lastHomeSyncTime = now;
+      const homeResults = await Promise.allSettled([
+        fetchApi('home', { page: 1, sort: 0 }, { ttlMs: 120000, signal, force }),
+        fetchApi('home', { page: 2, sort: 0 }, { ttlMs: 120000, signal, force })
+      ]);
+
+      for (const res of homeResults) {
+        if (res.status === 'fulfilled' && Array.isArray(res.value?.comics)) {
+          for (const c of res.value.comics) {
+            if (c?.slug && !homeMap.has(c.slug)) homeMap.set(c.slug, c);
+          }
+        }
+      }
+    }
+
+    // Apply Tier 1 matches immediately
+    const tier2Targets = [];
+    let tier1Changed = 0;
+    for (const bm of allTargets) {
+      const homeComic = homeMap.get(bm.slug);
+      const firstChap = homeComic?.chapters?.[0];
+      if (homeComic && firstChap) {
+        sessionSyncedSlugs.add(bm.slug);
+        const hadNew = firstChap.title && bm.latestChapter !== firstChap.title;
+        const changed = mergeBookmarkChapterInfo(bm, {
+          title: homeComic.title,
+          cover: homeComic.cover,
+          views: homeComic.views,
+          latestChapter: firstChap.title || firstChap.name || '',
+          latestChapterSlug: firstChap.chapterSlug || '',
+          latestTime: firstChap.time || ''
+        });
+        if (hadNew) newChapterCount++;
+        if (changed) {
+          changedCount++;
+          tier1Changed++;
+        }
+        checked++;
+      } else {
+        tier2Targets.push(bm);
+      }
+    }
+
+    if (tier1Changed > 0) {
+      saveBookmarks();
+      if (state.currentView === 'bookmarks') renderBookmarksList();
+    }
+    setSyncBtnState(true, `${checked}/${totalCount}`);
+
+    // Tier 2: Check ALL remaining targets in batches of 3 (complete coverage)
+    for (let i = 0; i < tier2Targets.length; i += 3) {
+      if (signal.aborted) break;
+      const batch = tier2Targets.slice(i, i + 3);
+
       await Promise.all(
         batch.map(async (bm) => {
           try {
             const detail = await fetchApi(
               'detail',
               { slug: bm.slug },
-              { ttlMs: 180000, signal: syncAbort.signal, force }
+              { ttlMs: 180000, signal, force }
             );
+            sessionSyncedSlugs.add(bm.slug);
+
             if (detail?.chapters?.length) {
               const latest = detail.chapters[0];
-              const latestTitle = latest.name || latest.title || '';
-              const latestTime = latest.time || '';
-              const parsedTime = parseVietnameseTime(latestTime);
-
-              if (latestTitle && bm.latestChapter !== latestTitle) {
-                bm.latestChapter = latestTitle;
-                bm.latestChapterSlug = latest.chapterSlug;
-                bm.latestTime = latestTime;
-                bm.updatedAt = parsedTime > 0 ? parsedTime : Date.now();
-                updatedCount++;
-              } else if (parsedTime > 0 && bm.updatedAt !== parsedTime) {
-                bm.updatedAt = parsedTime;
-                bm.latestTime = latestTime;
-              }
+              const chapTitle = latest.name || latest.title || '';
+              const hadNew = Boolean(chapTitle && bm.latestChapter !== chapTitle);
+              const changed = mergeBookmarkChapterInfo(bm, {
+                title: detail.title,
+                cover: detail.cover,
+                views: detail.views,
+                latestChapter: chapTitle,
+                latestChapterSlug: latest.chapterSlug || '',
+                latestTime: latest.time || ''
+              });
+              if (hadNew) newChapterCount++;
+              if (changed) changedCount++;
             }
           } catch {}
           checked++;
-          if (btn) btn.textContent = `🔄 Đang kiểm tra ${checked}/${targets.length}...`;
+          setSyncBtnState(true, `${checked}/${totalCount}`);
         })
       );
     }
 
-    if (updatedCount > 0) {
+    if (!unsyncedOnly) {
+      lastFullSyncTime = Date.now();
+    }
+
+    if (changedCount > 0) {
       saveBookmarks();
       if (state.currentView === 'bookmarks') renderBookmarksList();
-      showToast(`✨ Có ${updatedCount} truyện vừa cập nhật chương mới!`);
-    } else if (force) {
-      saveBookmarks();
-      if (state.currentView === 'bookmarks') renderBookmarksList();
-      showToast('✅ Tất cả truyện theo dõi đều đã mới nhất!');
+    }
+
+    if (!signal.aborted) {
+      if (newChapterCount > 0) {
+        showToast(`Có ${newChapterCount} truyện vừa cập nhật chương mới`);
+      } else if (force) {
+        showToast(
+          changedCount > 0
+            ? 'Đã cập nhật lại thứ tự theo thời gian mới nhất'
+            : 'Tất cả truyện theo dõi đều đã mới nhất'
+        );
+      }
     }
   } finally {
-    syncAbort = null;
-    if (btn) {
-      btn.disabled = false;
-      btn.textContent = '🔄 Cập nhật chap';
+    if (changedCount > 0) {
+      saveBookmarks();
     }
+    syncAbort = null;
+    setSyncBtnState(false, 'Cập nhật');
   }
 }
 
@@ -180,7 +288,7 @@ export function renderHistoryList() {
     .trim()
     .toLowerCase();
 
-  if (pill) pill.textContent = `${state.history.length} đã đọc`;
+  if (pill) pill.textContent = `${state.history.length} truyện`;
   if (!listEl) return;
 
   const items = filterText
@@ -191,7 +299,7 @@ export function renderHistoryList() {
   if (!items.length) {
     listEl.innerHTML = `
       <div style="text-align: center; padding: 56px 20px; color: var(--text-dim);">
-        <p>${state.history.length ? 'Không có lịch sử khớp từ khóa lọc.' : 'Chưa có lịch sử đọc truyện nào!'}</p>
+        <p>${state.history.length ? 'Không có lịch sử khớp từ khóa lọc.' : 'Chưa có lịch sử đọc truyện nào.'}</p>
       </div>
     `;
     return;
@@ -207,7 +315,7 @@ export function renderHistoryList() {
     const prog = getReadingProgress(item.slug);
     const pageInfo =
       prog && prog.chapterSlug === item.chapterSlug && prog.pageIndex > 0
-        ? ` • Trang ${prog.pageIndex + 1}/${prog.totalPages || '?'}`
+        ? ` · Trang ${prog.pageIndex + 1}/${prog.totalPages || '?'}`
         : '';
 
     const coverUrl = item.cover ? getProxyImageUrl(item.cover) : FALLBACK_COVER;
@@ -218,18 +326,18 @@ export function renderHistoryList() {
     card.innerHTML = `
       <div class="history-left">
         <div class="history-thumb-wrap">
-          <img class="history-thumb" src="${coverUrl}" alt="${safeTitle}" loading="lazy" onerror="this.onerror=null;this.src='${FALLBACK_COVER}'">
+          <img class="history-thumb" src="${coverUrl}" alt="${safeTitle}" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='${FALLBACK_COVER}'">
         </div>
         <div class="history-meta-wrap">
           <h4 class="history-title" title="${safeTitle}">${safeTitle}</h4>
-          <div class="history-chapter">Đang đọc: ${safeChap}</div>
+          <div class="history-chapter">${safeChap}</div>
           <div class="history-time">${safeTime}</div>
         </div>
       </div>
       <div class="history-actions">
         <button class="btn btn-secondary btn-sm btn-hist-detail" title="Xem chi tiết truyện">Chi tiết</button>
         <button class="btn btn-primary btn-sm btn-hist-read">Đọc tiếp</button>
-        <button class="btn-icon btn-hist-del" title="Xóa khỏi lịch sử">✕</button>
+        <button class="btn-icon btn-hist-del" title="Xóa khỏi lịch sử">${ICONS.close(16)}</button>
       </div>
     `;
     frag.appendChild(card);
@@ -249,6 +357,11 @@ export function initLibraryInteractions() {
     renderBookmarksList();
   });
 
+  document.getElementById('btn-filter-unread')?.addEventListener('click', () => {
+    state.bookmarkUnreadOnly = !state.bookmarkUnreadOnly;
+    renderBookmarksList();
+  });
+
   document.getElementById('bookmarks-filter-input')?.addEventListener(
     'input',
     debounce(() => renderBookmarksList(), 150)
@@ -258,14 +371,29 @@ export function initLibraryInteractions() {
     syncBookmarksUpdates(true);
   });
 
+  // Overflow menu toggle (Export / Import / Clear All)
+  const moreBtn = document.getElementById('btn-bookmarks-more');
+  const moreMenu = document.getElementById('bookmarks-more-menu');
+  moreBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    moreMenu?.classList.toggle('hidden');
+  });
+  document.addEventListener('click', (e) => {
+    if (moreMenu && !moreMenu.classList.contains('hidden') && !e.target.closest('.more-menu-wrap')) {
+      moreMenu.classList.add('hidden');
+    }
+  });
+
   document.getElementById('btn-clear-bookmarks')?.addEventListener('click', () => {
-    if (confirm('Bạn có chắc muốn xóa tất cả truyện yêu thích?')) {
+    moreMenu?.classList.add('hidden');
+    if (confirm('Bạn có chắc muốn xóa tất cả truyện theo dõi?')) {
       clearAllBookmarks();
       renderBookmarksList();
     }
   });
 
   document.getElementById('btn-export-backup')?.addEventListener('click', () => {
+    moreMenu?.classList.add('hidden');
     const backupData = {
       bookmarks: state.bookmarks,
       history: state.history,
@@ -280,10 +408,11 @@ export function initLibraryInteractions() {
     a.download = `mangaflow_backup_${Date.now()}.json`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    showToast('💾 Đã tải file backup về máy!');
+    showToast('Đã tải file sao lưu về máy');
   });
 
   document.getElementById('input-import-backup')?.addEventListener('change', (e) => {
+    moreMenu?.classList.add('hidden');
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
@@ -291,7 +420,7 @@ export function initLibraryInteractions() {
       try {
         const data = JSON.parse(String(ev.target?.result || '{}'));
         if (Array.isArray(data.bookmarks)) {
-          state.bookmarks = data.bookmarks.filter((b) => b && b.slug).map(compactBookmark);
+          state.bookmarks = data.bookmarks.filter((b) => b && b.slug).map((b) => compactBookmark(b));
         }
         if (Array.isArray(data.history)) {
           state.history = data.history.slice(0, 60);
@@ -307,9 +436,9 @@ export function initLibraryInteractions() {
         }
         saveBookmarks();
         renderBookmarksList();
-        showToast('📥 Phục hồi dữ liệu thành công!');
+        showToast('Phục hồi dữ liệu thành công');
       } catch {
-        showToast('Lỗi đọc file backup JSON!');
+        showToast('Lỗi đọc file sao lưu JSON');
       }
       e.target.value = '';
     };

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>MangaFlow - Trình Đọc Truyện Tranh Online</title>
+  <title>MangaFlow - Đọc Truyện Tranh</title>
 
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#080b12">
@@ -16,13 +16,13 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="css/tokens.css?v=3.5">
-  <link rel="stylesheet" href="css/base.css?v=3.5">
-  <link rel="stylesheet" href="css/views.css?v=3.5">
-  <link rel="stylesheet" href="css/reader.css?v=3.5">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⛩️</text></svg>">
+  <link rel="stylesheet" href="css/tokens.css?v=4.0">
+  <link rel="stylesheet" href="css/base.css?v=4.0">
+  <link rel="stylesheet" href="css/views.css?v=4.0">
+  <link rel="stylesheet" href="css/reader.css?v=4.0">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23ff2a55'/%3E%3Cpath d='M9 8h5a3 3 0 0 1 2 1 3 3 0 0 1 2-1h5v15h-5a2 2 0 0 0-2 1 2 2 0 0 0-2-1H9V8z' fill='none' stroke='%23fff' stroke-width='2' stroke-linejoin='round'/%3E%3C/svg%3E">
 </head>
 <body>
   <!-- GPU Reading Progress Bar -->
@@ -32,32 +32,41 @@
   <header class="app-header" id="app-header">
     <div class="header-container">
       <div class="brand-group">
-        <button id="btn-back-global" class="btn-icon hidden" title="Quay lại">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <button id="btn-back-global" class="btn-icon hidden" title="Quay lại" aria-label="Quay lại">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="15 18 9 12 15 6"></polyline>
           </svg>
         </button>
         <a href="#home" class="logo" id="logo-link">
-          <span class="logo-icon">⛩️</span>
-          <div>
+          <span class="logo-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M2 4h7a3 3 0 0 1 3 3v13a2 2 0 0 0-2-2H2z"></path>
+              <path d="M22 4h-7a3 3 0 0 0-3 3v13a2 2 0 0 1 2-2h8z"></path>
+            </svg>
+          </span>
+          <span class="logo-text">
             <span class="logo-title">Manga<span class="highlight">Flow</span></span>
-            <span class="logo-sub">TruyenQQ • Live</span>
-          </div>
+          </span>
         </a>
       </div>
 
       <!-- Search Box with Live Suggestions & Recent History -->
       <div class="search-wrapper">
         <div class="search-input-group">
-          <svg class="search-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+          <svg class="search-icon" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="11" cy="11" r="8"></circle>
             <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
           </svg>
-          <input type="text" id="search-input" placeholder="Tìm kiếm truyện tranh..." autocomplete="off">
-          <button id="search-clear-btn" class="search-clear-btn hidden" title="Xóa">✕</button>
-          <button id="search-btn" class="search-submit-btn" title="Tìm kiếm">
-            <span class="search-btn-text">Tìm kiếm</span>
-            <svg class="search-btn-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5">
+          <input type="text" id="search-input" placeholder="Tìm truyện tranh..." autocomplete="off">
+          <button id="search-clear-btn" class="search-clear-btn hidden" title="Xóa" aria-label="Xóa từ khóa">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+          <button id="search-btn" class="search-submit-btn" title="Tìm kiếm" aria-label="Tìm kiếm">
+            <span class="search-btn-text">Tìm</span>
+            <svg class="search-btn-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
               <circle cx="11" cy="11" r="8"></circle>
               <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
             </svg>
@@ -66,47 +75,44 @@
 
         <div class="search-dropdown hidden" id="search-dropdown">
           <div class="search-dropdown-header">
-            <span id="search-dropdown-heading">Gợi ý kết quả</span>
-            <span class="dropdown-tip">Enter để xem tất cả</span>
+            <span id="search-dropdown-heading">Gợi ý</span>
+            <span class="dropdown-tip">Enter để tìm tất cả</span>
           </div>
           <div class="search-dropdown-list" id="search-dropdown-list"></div>
         </div>
       </div>
 
-      <!-- Desktop Nav -->
+      <!-- Desktop Nav (4 clean tabs, no clutter) -->
       <nav class="nav-actions">
-        <button class="nav-btn active" data-tab="home" title="Trang chủ">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+        <button class="nav-btn active" data-tab="home" title="Khám phá">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
             <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
             <polyline points="9 22 9 12 15 12 15 22"></polyline>
           </svg>
           <span>Khám phá</span>
         </button>
-        <button class="nav-btn" id="btn-open-genres-modal" title="Tất cả thể loại">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="3" y="3" width="7" height="7"></rect>
-            <rect x="14" y="3" width="7" height="7"></rect>
-            <rect x="14" y="14" width="7" height="7"></rect>
-            <rect x="3" y="14" width="7" height="7"></rect>
+        <button class="nav-btn" id="btn-open-genres-modal" title="Thể loại">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="7" height="7" rx="1"></rect>
+            <rect x="14" y="3" width="7" height="7" rx="1"></rect>
+            <rect x="14" y="14" width="7" height="7" rx="1"></rect>
+            <rect x="3" y="14" width="7" height="7" rx="1"></rect>
           </svg>
           <span>Thể loại</span>
         </button>
-        <button class="nav-btn" data-tab="bookmarks" title="Truyện theo dõi">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+        <button class="nav-btn" data-tab="bookmarks" title="Theo dõi">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
             <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
           </svg>
           <span>Yêu thích</span>
           <span class="badge" id="bookmark-badge">0</span>
         </button>
-        <button class="nav-btn" data-tab="history" title="Lịch sử đọc">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+        <button class="nav-btn" data-tab="history" title="Lịch sử">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="10"></circle>
             <polyline points="12 6 12 12 16 14"></polyline>
           </svg>
           <span>Lịch sử</span>
-        </button>
-        <button class="nav-btn btn-dice" id="btn-random-manga" title="Đọc ngẫu nhiên một truyện">
-          <span>🎲 Random</span>
         </button>
       </nav>
     </div>
@@ -117,70 +123,47 @@
     <section id="view-home" class="view active">
       <div class="filter-strip">
         <div class="filter-scroll no-scrollbar" id="filter-scroll">
-          <button class="filter-chip active" data-sort="0">🔥 Mới Cập Nhật</button>
-          <button class="filter-chip" data-sort="10">👑 Top Ngày</button>
-          <button class="filter-chip" data-sort="12">⭐ Top Tuần</button>
-          <button class="filter-chip" data-sort="11">📅 Top Tháng</button>
-          <button class="filter-chip" data-sort="20">❤️ Yêu Thích</button>
-          <button class="filter-chip" data-status="2">🏆 Truyện Full</button>
-          <button class="filter-chip" data-genre="action">⚔️ Action</button>
-          <button class="filter-chip" data-genre="manhwa">🇰🇷 Manhwa</button>
-          <button class="filter-chip" data-genre="manhua">🇨🇳 Manhua</button>
-          <button class="filter-chip" data-genre="manga">🇯🇵 Manga</button>
-          <button class="filter-chip" data-genre="chuyen-sinh">✨ Chuyển Sinh</button>
-          <button class="filter-chip" data-genre="xuyen-khong">🚀 Xuyên Không</button>
-          <button class="filter-chip" data-genre="co-dai">🏯 Cổ Đại</button>
-          <button class="filter-chip" data-genre="ngon-tinh">💕 Ngôn Tình</button>
-          <button class="filter-chip" data-genre="romance">💖 Romance</button>
-          <button class="filter-chip" data-genre="comedy">😂 Comedy</button>
-          <button class="filter-chip" data-genre="fantasy">🧙 Fantasy</button>
-          <button class="filter-chip" data-genre="shounen">⚡ Shounen</button>
-          <button class="filter-chip" data-genre="truyen-mau">🎨 Truyện Màu</button>
-          <button class="filter-chip" data-genre="webtoon">📱 Webtoon</button>
-          <button class="filter-chip" data-genre="martial-arts">🥋 Võ Thuật</button>
+          <button class="filter-chip active" data-sort="0">Mới cập nhật</button>
+          <button class="filter-chip" data-sort="10">Top ngày</button>
+          <button class="filter-chip" data-sort="12">Top tuần</button>
+          <button class="filter-chip" data-sort="11">Top tháng</button>
+          <button class="filter-chip" data-sort="20">Yêu thích</button>
+          <button class="filter-chip" data-status="2">Truyện Full</button>
+          <button class="filter-chip" data-genre="action">Action</button>
+          <button class="filter-chip" data-genre="manhwa">Manhwa</button>
+          <button class="filter-chip" data-genre="manhua">Manhua</button>
+          <button class="filter-chip" data-genre="manga">Manga</button>
+          <button class="filter-chip" data-genre="chuyen-sinh">Chuyển Sinh</button>
+          <button class="filter-chip" data-genre="xuyen-khong">Xuyên Không</button>
+          <button class="filter-chip" data-genre="co-dai">Cổ Đại</button>
+          <button class="filter-chip" data-genre="ngon-tinh">Ngôn Tình</button>
+          <button class="filter-chip" data-genre="romance">Romance</button>
+          <button class="filter-chip" data-genre="comedy">Comedy</button>
+          <button class="filter-chip" data-genre="fantasy">Fantasy</button>
+          <button class="filter-chip" data-genre="shounen">Shounen</button>
+          <button class="filter-chip" data-genre="truyen-mau">Truyện Màu</button>
+          <button class="filter-chip" data-genre="webtoon">Webtoon</button>
+          <button class="filter-chip" data-genre="martial-arts">Võ Thuật</button>
         </div>
       </div>
 
-      <!-- Hero Spotlight -->
-      <div class="featured-section hidden" id="featured-section">
-        <div class="hero-spotlight-card">
-          <div class="hero-spotlight-bg" id="featured-bg"></div>
-          <div class="hero-spotlight-overlay"></div>
-          <div class="hero-spotlight-content">
-            <div class="hero-cover-wrap">
-              <img id="featured-cover-img" class="hero-cover-img" src="assets/cover-fallback.svg" alt="Manga Spotlight">
-              <div class="hero-cover-badge">🔥 NỔI BẬT</div>
-            </div>
-            <div class="hero-details">
-              <div class="hero-badges-row">
-                <span class="badge-hot-tag">⭐ ĐỀ XUẤT</span>
-                <span class="badge-stat-tag" id="featured-status-badge">TruyenQQ Live</span>
-                <span class="badge-stat-tag" id="featured-time-badge">Mới cập nhật</span>
-              </div>
-              <h2 class="hero-title" id="featured-title">Đang tải truyện mới...</h2>
-              <p class="hero-desc" id="featured-desc">Đang đồng bộ danh sách truyện mới nhất...</p>
-              <div class="hero-actions">
-                <button class="btn btn-primary btn-large" id="featured-read-btn">
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                  </svg>
-                  Đọc Chap Mới
-                </button>
-                <button class="btn btn-secondary btn-large" id="featured-detail-btn">Chi Tiết</button>
-              </div>
-            </div>
-          </div>
+      <!-- Compact Continue Reading Strip (shown only when reading history exists) -->
+      <div class="continue-strip hidden" id="continue-reading-strip">
+        <div class="continue-header">
+          <span class="continue-heading">Tiếp tục đọc</span>
+          <button type="button" class="btn-link-subtle" id="btn-continue-all">Xem tất cả</button>
         </div>
+        <div class="continue-list no-scrollbar" id="continue-reading-list"></div>
       </div>
 
       <div class="section-header">
         <div class="title-with-count">
-          <h2 class="section-title" id="home-section-title">Danh Sách Truyện Mới Cập Nhật</h2>
+          <h2 class="section-title" id="home-section-title">Mới Cập Nhật</h2>
           <span class="count-pill" id="comics-count-pill">0 truyện</span>
         </div>
         <div class="live-status">
           <span class="status-dot"></span>
-          <span id="live-source-label">TruyenQQ Live</span>
+          <span id="live-source-label">TruyenQQ</span>
         </div>
       </div>
 
@@ -188,11 +171,21 @@
 
       <!-- Pagination -->
       <div class="pagination-bar" id="pagination-bar">
-        <button class="btn-page" id="btn-prev-page" disabled>‹ Trang trước</button>
+        <button class="btn-page" id="btn-prev-page" disabled>
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <polyline points="15 18 9 12 15 6"></polyline>
+          </svg>
+          <span>Trước</span>
+        </button>
         <div class="page-numbers" id="page-numbers"></div>
-        <button class="btn-page" id="btn-next-page">Trang sau ›</button>
+        <button class="btn-page" id="btn-next-page">
+          <span>Sau</span>
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+        </button>
         <div class="page-jump-wrap" id="page-jump-wrap">
-          <span>Đến:</span>
+          <span>Trang:</span>
           <input type="number" id="page-jump-input" class="page-jump-input" min="1" placeholder="1">
         </div>
       </div>
@@ -200,20 +193,19 @@
 
     <!-- ==================== DETAIL VIEW ==================== -->
     <section id="view-detail" class="view">
-      <div class="detail-backdrop" id="detail-backdrop"></div>
       <div class="detail-container">
         <div class="detail-header-card">
           <div class="detail-cover-wrapper">
             <img id="detail-cover" class="detail-cover" src="assets/cover-fallback.svg" alt="Cover">
-            <button class="btn-favorite-float" id="btn-favorite-toggle" title="Theo dõi truyện">
-              <svg id="favorite-heart-icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+            <button class="btn-favorite-float" id="btn-favorite-toggle" title="Theo dõi truyện" aria-label="Theo dõi truyện">
+              <svg id="favorite-heart-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
               </svg>
             </button>
           </div>
 
           <div class="detail-meta">
-            <h1 class="detail-title" id="detail-title">Tên Truyện</h1>
+            <h1 class="detail-title" id="detail-title">Tên truyện</h1>
 
             <div class="detail-stats-row">
               <div class="stat-item">
@@ -238,19 +230,19 @@
 
             <div class="detail-actions">
               <button class="btn btn-primary btn-large hidden" id="btn-read-continue">
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                  <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                  <polygon points="6 4 20 12 6 20 6 4"></polygon>
                 </svg>
-                <span id="read-continue-label">Đọc Tiếp</span>
+                <span id="read-continue-label">Đọc tiếp</span>
               </button>
-              <button class="btn btn-primary btn-large" id="btn-read-first">Đọc Từ Đầu</button>
-              <button class="btn btn-secondary btn-large" id="btn-read-latest">Chap Mới Nhất</button>
+              <button class="btn btn-primary btn-large" id="btn-read-first">Đọc từ đầu</button>
+              <button class="btn btn-secondary btn-large" id="btn-read-latest">Chap mới nhất</button>
             </div>
           </div>
         </div>
 
         <div class="detail-card">
-          <h3 class="card-title">📖 Tóm Tắt Nội Dung</h3>
+          <h3 class="card-title">Tóm tắt nội dung</h3>
           <p class="synopsis-text is-collapsed" id="detail-synopsis">Đang tải tóm tắt...</p>
           <button class="btn-toggle-synopsis hidden" id="btn-toggle-synopsis">Xem thêm</button>
         </div>
@@ -258,18 +250,18 @@
         <div class="detail-card">
           <div class="chapter-list-header">
             <div class="chapter-count-group">
-              <h3 class="card-title">📑 Danh Sách Chương</h3>
+              <h3 class="card-title">Danh sách chương</h3>
               <span class="chapter-badge" id="detail-chapter-count">0 chương</span>
               <span class="chapter-progress-pill hidden" id="detail-read-progress"></span>
             </div>
 
             <div class="chapter-controls">
               <div class="chapter-search-box">
-                <input type="text" id="chapter-search-input" placeholder="Tìm số chương (vd: 50)...">
+                <input type="text" id="chapter-search-input" placeholder="Tìm chương (vd: 50)...">
               </div>
               <button class="btn-sort" id="btn-sort-chapters" title="Đổi thứ tự chương">
                 <span id="sort-order-text">Mới nhất</span>
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
                   <path d="M7 16V4m0 0L3 8m4-4l4 4m6 4v12m0 0l4-4m-4 4l-4-4"></path>
                 </svg>
               </button>
@@ -284,38 +276,44 @@
 
     <!-- ==================== READER VIEW ==================== -->
     <section id="view-reader" class="view">
-      <!-- Brightness Dimmer -->
       <div class="reader-dimmer" id="reader-dimmer"></div>
 
       <!-- Top HUD Bar -->
       <div class="reader-top-bar" id="reader-top-bar">
         <div class="reader-toolbar-left">
-          <button class="btn-icon" id="btn-reader-back" title="Quay lại chi tiết truyện (Esc)">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2">
+          <button class="btn-icon" id="btn-reader-back" title="Quay lại (Esc)" aria-label="Quay lại">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="15 18 9 12 15 6"></polyline>
             </svg>
           </button>
           <div class="reader-title-group">
-            <div class="reader-comic-title" id="reader-comic-title">Tên Truyện</div>
-            <div class="reader-chapter-title" id="reader-chapter-title">Chapter...</div>
+            <div class="reader-comic-title" id="reader-comic-title">Tên truyện</div>
+            <div class="reader-chapter-title" id="reader-chapter-title">Chapter</div>
           </div>
         </div>
 
         <div class="reader-toolbar-right">
-          <button class="btn-icon" id="btn-reader-fav" title="Theo dõi truyện">
-            <svg id="reader-fav-icon" viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2">
+          <button class="btn-icon" id="btn-reader-fav" title="Theo dõi" aria-label="Theo dõi truyện">
+            <svg id="reader-fav-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
               <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
             </svg>
           </button>
-          <button class="btn-icon" id="btn-fullscreen" title="Toàn màn hình (F)">
-            <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2">
+          <button class="btn-icon" id="btn-fullscreen" title="Toàn màn hình (F)" aria-label="Toàn màn hình">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
               <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
             </svg>
           </button>
-          <button class="btn-icon" id="btn-reader-settings" title="Cài đặt đọc truyện">
-            <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="3"></circle>
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          <button class="btn-icon" id="btn-reader-settings" title="Cài đặt đọc" aria-label="Cài đặt đọc">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="4" y1="21" x2="4" y2="14"></line>
+              <line x1="4" y1="10" x2="4" y2="3"></line>
+              <line x1="12" y1="21" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12" y2="3"></line>
+              <line x1="20" y1="21" x2="20" y2="16"></line>
+              <line x1="20" y1="12" x2="20" y2="3"></line>
+              <line x1="2" y1="14" x2="6" y2="14"></line>
+              <line x1="10" y1="8" x2="14" y2="8"></line>
+              <line x1="18" y1="16" x2="22" y2="16"></line>
             </svg>
           </button>
         </div>
@@ -325,7 +323,7 @@
       <div class="reader-canvas" id="reader-canvas">
         <div class="reader-loading hidden" id="reader-loading">
           <div class="spinner"></div>
-          <p>Đang tải hình ảnh chương truyện...</p>
+          <p>Đang tải chương truyện...</p>
         </div>
 
         <!-- Webtoon Vertical Container -->
@@ -337,35 +335,99 @@
             <div class="paged-tap-zone left" id="paged-tap-left"></div>
             <div class="paged-tap-zone center" id="paged-tap-center"></div>
             <div class="paged-tap-zone right" id="paged-tap-right"></div>
-            <button class="paged-nav-btn prev" id="paged-prev-btn" title="Trang trước">‹</button>
+            <button class="paged-nav-btn prev" id="paged-prev-btn" title="Trang trước" aria-label="Trang trước">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                <polyline points="15 18 9 12 15 6"></polyline>
+              </svg>
+            </button>
             <img class="paged-current-img" id="paged-current-img" src="" alt="Page" decoding="async">
             <div class="reader-page-error hidden" id="paged-page-error">
               <span>Không tải được trang này</span>
-              <button class="btn btn-sm btn-primary" id="paged-retry-btn">↻ Tải lại</button>
+              <button class="btn btn-sm btn-primary" id="paged-retry-btn">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                  <polyline points="23 4 23 10 17 10"></polyline>
+                  <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                </svg>
+                <span>Tải lại</span>
+              </button>
             </div>
-            <button class="paged-nav-btn next" id="paged-next-btn" title="Trang sau">›</button>
+            <button class="paged-nav-btn next" id="paged-next-btn" title="Trang sau" aria-label="Trang sau">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                <polyline points="9 18 15 12 9 6"></polyline>
+              </svg>
+            </button>
           </div>
         </div>
       </div>
 
       <!-- End-of-Chapter Footer Navigation -->
       <div class="reader-end-nav" id="reader-end-nav">
-        <button class="btn btn-secondary btn-nav-bottom" id="btn-bottom-prev">‹ Chương Trước</button>
-        <button class="btn btn-primary btn-nav-bottom" id="btn-bottom-next">Chương Sau ›</button>
+        <button class="btn btn-secondary btn-nav-bottom" id="btn-bottom-prev">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <polyline points="15 18 9 12 15 6"></polyline>
+          </svg>
+          <span>Chương trước</span>
+        </button>
+        <button class="btn btn-primary btn-nav-bottom" id="btn-bottom-next">
+          <span>Chương sau</span>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+        </button>
       </div>
 
       <!-- Bottom Thumb-Zone HUD Bar -->
       <div class="reader-bottom-bar" id="reader-bottom-bar">
         <div class="reader-hud-scrubber-row">
-          <span class="reader-page-counter" id="reader-page-counter">Trang 0 / 0</span>
+          <span class="reader-page-counter" id="reader-page-counter">0 / 0</span>
           <input type="range" class="reader-hud-scrubber" id="reader-hud-scrubber" min="1" max="1" value="1">
         </div>
         <div class="reader-hud-actions-row">
-          <button class="btn-hud" id="btn-hud-prev" title="Chương trước">‹ <span class="hud-label-hide-sm">Trước</span></button>
-          <button class="btn-hud" id="btn-hud-chapters" title="Danh sách chương">📑 Chương</button>
-          <button class="btn-hud" id="btn-hud-autoscroll" title="Tự động cuộn (Space)">▶ <span class="hud-label-hide-sm">Tự cuộn</span></button>
-          <button class="btn-hud" id="btn-hud-settings" title="Cài đặt đọc">⚙️ <span class="hud-label-hide-sm">Cài đặt</span></button>
-          <button class="btn-hud" id="btn-hud-next" title="Chương sau"><span class="hud-label-hide-sm">Sau</span> ›</button>
+          <button class="btn-hud" id="btn-hud-prev" title="Chương trước">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <polyline points="15 18 9 12 15 6"></polyline>
+            </svg>
+            <span class="hud-label-hide-sm">Trước</span>
+          </button>
+          <button class="btn-hud" id="btn-hud-chapters" title="Danh sách chương">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
+              <line x1="8" y1="6" x2="21" y2="6"></line>
+              <line x1="8" y1="12" x2="21" y2="12"></line>
+              <line x1="8" y1="18" x2="21" y2="18"></line>
+              <line x1="3" y1="6" x2="3.01" y2="6"></line>
+              <line x1="3" y1="12" x2="3.01" y2="12"></line>
+              <line x1="3" y1="18" x2="3.01" y2="18"></line>
+            </svg>
+            <span>Chương</span>
+          </button>
+          <button class="btn-hud" id="btn-hud-autoscroll" title="Tự động cuộn (Space)">
+            <span class="hud-autoscroll-icon">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
+                <polygon points="6 4 20 12 6 20 6 4"></polygon>
+              </svg>
+            </span>
+            <span class="hud-label-hide-sm">Tự cuộn</span>
+          </button>
+          <button class="btn-hud" id="btn-hud-settings" title="Cài đặt đọc">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
+              <line x1="4" y1="21" x2="4" y2="14"></line>
+              <line x1="4" y1="10" x2="4" y2="3"></line>
+              <line x1="12" y1="21" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12" y2="3"></line>
+              <line x1="20" y1="21" x2="20" y2="16"></line>
+              <line x1="20" y1="12" x2="20" y2="3"></line>
+              <line x1="2" y1="14" x2="6" y2="14"></line>
+              <line x1="10" y1="8" x2="14" y2="8"></line>
+              <line x1="18" y1="16" x2="22" y2="16"></line>
+            </svg>
+            <span class="hud-label-hide-sm">Cài đặt</span>
+          </button>
+          <button class="btn-hud" id="btn-hud-next" title="Chương sau">
+            <span class="hud-label-hide-sm">Sau</span>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <polyline points="9 18 15 12 9 6"></polyline>
+            </svg>
+          </button>
         </div>
       </div>
 
@@ -373,23 +435,28 @@
       <div class="settings-sheet-overlay hidden" id="settings-sheet-overlay">
         <div class="settings-sheet" id="settings-sheet">
           <div class="settings-sheet-header">
-            <h3>⚙️ Cài Đặt Trình Đọc</h3>
-            <button class="btn-icon" id="btn-close-settings">✕</button>
+            <h3>Cài đặt trình đọc</h3>
+            <button class="btn-icon" id="btn-close-settings" aria-label="Đóng">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
           </div>
 
           <div class="settings-group">
             <div class="settings-label"><span>Chế độ đọc</span></div>
             <div class="segmented-group">
-              <button class="seg-btn" data-setting-mode="webtoon">📜 Cuộn dọc</button>
-              <button class="seg-btn" data-setting-mode="paged">📖 Lật trang</button>
+              <button class="seg-btn" data-setting-mode="webtoon">Cuộn dọc</button>
+              <button class="seg-btn" data-setting-mode="paged">Lật trang</button>
             </div>
           </div>
 
           <div class="settings-group" id="setting-dir-group">
-            <div class="settings-label"><span>Hướng lật trang (Paged)</span></div>
+            <div class="settings-label"><span>Hướng lật trang</span></div>
             <div class="segmented-group">
-              <button class="seg-btn" data-setting-dir="ltr">Trái → Phải</button>
-              <button class="seg-btn" data-setting-dir="rtl">Phải → Trái (Manga)</button>
+              <button class="seg-btn" data-setting-dir="ltr">Trái sang phải</button>
+              <button class="seg-btn" data-setting-dir="rtl">Phải sang trái</button>
             </div>
           </div>
 
@@ -404,19 +471,19 @@
           </div>
 
           <div class="settings-group">
-            <div class="settings-label"><span>Khoảng cách giữa trang</span></div>
+            <div class="settings-label"><span>Khoảng cách trang</span></div>
             <div class="segmented-group">
-              <button class="seg-btn" data-setting-gap="0px">Liền mạch (0px)</button>
-              <button class="seg-btn" data-setting-gap="8px">Thoáng (8px)</button>
+              <button class="seg-btn" data-setting-gap="0px">Liền mạch</button>
+              <button class="seg-btn" data-setting-gap="8px">Tách nhẹ</button>
             </div>
           </div>
 
           <div class="settings-group">
-            <div class="settings-label"><span>Chủ đề & Bảo vệ mắt</span></div>
+            <div class="settings-label"><span>Giao diện nền</span></div>
             <div class="segmented-group">
-              <button class="seg-btn" data-setting-theme="dark">🌙 Dark</button>
-              <button class="seg-btn" data-setting-theme="oled">🖤 OLED</button>
-              <button class="seg-btn" data-setting-theme="sepia">📜 Sepia</button>
+              <button class="seg-btn" data-setting-theme="dark">Tối</button>
+              <button class="seg-btn" data-setting-theme="oled">Đen OLED</button>
+              <button class="seg-btn" data-setting-theme="sepia">Giấy ấm</button>
             </div>
           </div>
 
@@ -447,8 +514,13 @@
       <div class="chapter-drawer-overlay hidden" id="chapter-drawer-overlay">
         <div class="chapter-drawer">
           <div class="drawer-header">
-            <h3>📑 Danh Sách Chương</h3>
-            <button class="btn-icon" id="btn-close-drawer">✕</button>
+            <h3>Danh sách chương</h3>
+            <button class="btn-icon" id="btn-close-drawer" aria-label="Đóng">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
           </div>
           <div class="drawer-search">
             <input type="text" id="drawer-chap-search" placeholder="Lọc số chương...">
@@ -461,26 +533,53 @@
 
     <!-- ==================== BOOKMARKS VIEW ==================== -->
     <section id="view-bookmarks" class="view">
-      <div class="section-header">
+      <div class="section-header bookmarks-header">
         <div class="title-with-count">
-          <h2 class="section-title">❤️ Truyện Đang Theo Dõi</h2>
-          <span class="count-pill" id="bookmarks-count-pill">0 bộ truyện</span>
+          <h2 class="section-title">Truyện Theo Dõi</h2>
+          <span class="count-pill" id="bookmarks-count-pill">0 truyện</span>
         </div>
-        <div class="actions-group">
-          <input type="text" id="bookmarks-filter-input" class="library-filter-input" placeholder="Lọc truyện yêu thích...">
-          <select id="select-bookmark-sort" class="select-sort-compact" title="Sắp xếp danh sách">
-            <option value="updated">🕒 Mới cập nhật</option>
-            <option value="added">📅 Mới theo dõi</option>
-            <option value="az">🔤 Tên A-Z</option>
-          </select>
-          <button class="btn btn-secondary btn-sm" id="btn-sync-bookmarks">🔄 Cập nhật chap</button>
-          <button class="btn btn-secondary btn-sm" id="btn-export-backup">💾 Export</button>
-          <label class="btn btn-secondary btn-sm" style="cursor: pointer;">
-            📥 Import <input type="file" id="input-import-backup" accept=".json" style="display: none;">
-          </label>
-          <button class="btn btn-danger-ghost btn-sm" id="btn-clear-bookmarks">Xóa hết</button>
+        <div class="bookmarks-primary-actions">
+          <button class="btn btn-secondary btn-sm" id="btn-sync-bookmarks" title="Đồng bộ chương mới">
+            <span class="btn-svg-icon">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <polyline points="1 20 1 14 7 14"></polyline>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+              </svg>
+            </span>
+            <span>Cập nhật</span>
+          </button>
+          <div class="more-menu-wrap">
+            <button class="btn-icon" id="btn-bookmarks-more" title="Tùy chọn sao lưu" aria-label="Tùy chọn sao lưu">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                <circle cx="12" cy="5" r="1"></circle>
+                <circle cx="12" cy="12" r="1"></circle>
+                <circle cx="12" cy="19" r="1"></circle>
+              </svg>
+            </button>
+            <div class="more-menu hidden" id="bookmarks-more-menu">
+              <button class="more-menu-item" id="btn-export-backup">Xuất dữ liệu (JSON)</button>
+              <label class="more-menu-item">
+                Khôi phục dữ liệu
+                <input type="file" id="input-import-backup" accept=".json" style="display: none;">
+              </label>
+              <div class="more-menu-divider"></div>
+              <button class="more-menu-item is-danger" id="btn-clear-bookmarks">Xóa tất cả</button>
+            </div>
+          </div>
         </div>
       </div>
+
+      <div class="library-toolbar">
+        <input type="text" id="bookmarks-filter-input" class="library-filter-input" placeholder="Tìm trong theo dõi...">
+        <button class="filter-toggle-chip" id="btn-filter-unread" type="button">Có chap mới</button>
+        <select id="select-bookmark-sort" class="select-sort-compact" title="Sắp xếp">
+          <option value="updated">Mới cập nhật</option>
+          <option value="added">Mới theo dõi</option>
+          <option value="az">Tên A–Z</option>
+        </select>
+      </div>
+
       <div class="comics-grid" id="bookmarks-grid"></div>
     </section>
 
@@ -488,8 +587,8 @@
     <section id="view-history" class="view">
       <div class="section-header">
         <div class="title-with-count">
-          <h2 class="section-title">🕒 Lịch Sử Đọc Truyện</h2>
-          <span class="count-pill" id="history-count-pill">0 đã đọc</span>
+          <h2 class="section-title">Lịch Sử Đọc</h2>
+          <span class="count-pill" id="history-count-pill">0 truyện</span>
         </div>
         <div class="actions-group">
           <input type="text" id="history-filter-input" class="library-filter-input" placeholder="Lọc lịch sử...">
@@ -505,36 +604,40 @@
     <div class="modal-card">
       <div class="modal-header">
         <div class="modal-title-group">
-          <span style="font-size: 22px;">🗂️</span>
-          <h3>Khám Phá Thể Loại Truyện</h3>
+          <h3>Thể loại truyện</h3>
         </div>
-        <button class="btn-icon" id="btn-close-genres-modal">✕</button>
+        <button class="btn-icon" id="btn-close-genres-modal" aria-label="Đóng">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
       </div>
       <div class="genres-modal-grid no-scrollbar" id="genres-modal-grid"></div>
     </div>
   </div>
 
-  <!-- Mobile Bottom Navigation -->
+  <!-- Mobile Bottom Navigation (4 crisp items) -->
   <nav class="mobile-bottom-nav" id="mobile-bottom-nav">
     <button class="m-nav-item active" data-tab="home">
-      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
         <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
         <polyline points="9 22 9 12 15 12 15 22"></polyline>
       </svg>
       <span>Khám phá</span>
     </button>
     <button class="m-nav-item" id="btn-m-genres">
-      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
-        <rect x="3" y="3" width="7" height="7"></rect>
-        <rect x="14" y="3" width="7" height="7"></rect>
-        <rect x="14" y="14" width="7" height="7"></rect>
-        <rect x="3" y="14" width="7" height="7"></rect>
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="7" height="7" rx="1"></rect>
+        <rect x="14" y="3" width="7" height="7" rx="1"></rect>
+        <rect x="14" y="14" width="7" height="7" rx="1"></rect>
+        <rect x="3" y="14" width="7" height="7" rx="1"></rect>
       </svg>
       <span>Thể loại</span>
     </button>
     <button class="m-nav-item" data-tab="bookmarks">
       <div class="m-nav-icon-wrap">
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
           <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
         </svg>
         <span class="m-nav-badge" id="m-bookmark-badge">0</span>
@@ -542,15 +645,11 @@
       <span>Yêu thích</span>
     </button>
     <button class="m-nav-item" data-tab="history">
-      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="12" cy="12" r="10"></circle>
         <polyline points="12 6 12 12 16 14"></polyline>
       </svg>
       <span>Lịch sử</span>
-    </button>
-    <button class="m-nav-item" id="btn-m-random">
-      <span style="font-size: 20px; line-height: 1;">🎲</span>
-      <span>Random</span>
     </button>
   </nav>
 
@@ -561,6 +660,6 @@
     <span id="spinner-text">Đang tải dữ liệu...</span>
   </div>
 
-  <script type="module" src="js/main.js?v=3.5"></script>
+  <script type="module" src="js/main.js?v=4.0"></script>
 </body>
 </html>
